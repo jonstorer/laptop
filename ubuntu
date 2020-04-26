@@ -88,12 +88,14 @@ sudo apt install -y vim
 sudo apt install -y xclip
 
 fancy_echo "Install nodenv"
-append_to_zshrc 'eval "$(nodenv init -)"' 1
+append_to_zshrc 'export PATH="$HOME/.nodenv/bin:$PATH"'
+append_to_zshrc 'eval "$(nodenv init -)"'
 curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
 eval "$(nodenv init -)"
 
 fancy_echo "Install rbenv"
-append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
+append_to_zshrc 'export PATH="$HOME/.rbenv/bin:$PATH"'
+append_to_zshrc 'eval "$(rbenv init - --no-rehash)"'
 curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
 eval "$(rbenv init -)"
 
