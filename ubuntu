@@ -65,14 +65,13 @@ fancy_echo "Install"
 sudo apt install -y build-essential
 sudo apt install -y zsh
 
-shell_path="$(command -v zsh)"
-
 fancy_echo "Changing your shell to zsh ..."
+shell_path="$(command -v zsh)"
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   fancy_echo "Adding '$shell_path' to /etc/shells"
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
-sudo chsh -s "$shell_path" "$USER"
+sudo chsh -s "$shell_path"
 
 sudo apt install -y exuberant-ctags
 sudo apt install -y gcc
