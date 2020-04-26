@@ -11,127 +11,128 @@ fancy_echo() {
   printf "\n$fmt\n" "$@"
 }
 
-append_to_zshrc() {
-  local text="$1" zshrc
-  local skip_new_line="${2:-0}"
+#append_to_zshrc() {
+  #local text="$1" zshrc
+  #local skip_new_line="${2:-0}"
 
-  if [ -w "$HOME/.zshrc.local" ]; then
-    zshrc="$HOME/.zshrc.local"
-  else
-    zshrc="$HOME/.zshrc"
-  fi
+  #if [ -w "$HOME/.zshrc.local" ]; then
+    #zshrc="$HOME/.zshrc.local"
+  #else
+    #zshrc="$HOME/.zshrc"
+  #fi
 
-  if ! grep -Fqs "$text" "$zshrc"; then
-    if [ "$skip_new_line" -eq 1 ]; then
-      printf "%s\n" "$text" >> "$zshrc"
-    else
-      printf "\n%s\n" "$text" >> "$zshrc"
-    fi
-  fi
-}
+  #if ! grep -Fqs "$text" "$zshrc"; then
+    #if [ "$skip_new_line" -eq 1 ]; then
+      #printf "%s\n" "$text" >> "$zshrc"
+    #else
+      #printf "\n%s\n" "$text" >> "$zshrc"
+    #fi
+  #fi
+#}
 
 # shellcheck disable=SC2154
-trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+#trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 
-set -e
+#set -e
 
-if [ ! -d "$HOME/.bin/" ]; then
-  mkdir "$HOME/.bin"
-fi
+#if [ ! -d "$HOME/.bin/" ]; then
+  #mkdir "$HOME/.bin"
+#fi
 
-if [ ! -f "$HOME/.zshrc" ]; then
-  touch "$HOME/.zshrc"
-fi
+#if [ ! -f "$HOME/.zshrc" ]; then
+  #touch "$HOME/.zshrc"
+#fi
 
-# shellcheck disable=SC2016
-append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
+## shellcheck disable=SC2016
+#append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
 
-update_shell() {
-  local shell_path;
-  shell_path="$(command -v zsh)"
+#update_shell() {
+  #local shell_path;
+  #shell_path="$(command -v zsh)"
 
-  fancy_echo "Changing your shell to zsh ..."
-  if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-    fancy_echo "Adding '$shell_path' to /etc/shells"
-    sudo sh -c "echo $shell_path >> /etc/shells"
-  fi
-  sudo chsh -s "$shell_path" "$USER"
-}
+  #fancy_echo "Changing your shell to zsh ..."
+  #if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+    #fancy_echo "Adding '$shell_path' to /etc/shells"
+    #sudo sh -c "echo $shell_path >> /etc/shells"
+  #fi
+  #sudo chsh -s "$shell_path" "$USER"
+#}
 
-case "$SHELL" in
-  */zsh)
-    if [ "$(command -v zsh)" != '/usr/local/bin/zsh' ] ; then
-      update_shell
-    fi
-    ;;
-  *)
-    update_shell
-    ;;
-esac
+#case "$SHELL" in
+  #*/zsh)
+    #if [ "$(command -v zsh)" != '/usr/local/bin/zsh' ] ; then
+      #update_shell
+    #fi
+    #;;
+  #*)
+    #update_shell
+    #;;
+#esac
 
-gem_install_or_update() {
-  if gem list "$1" --installed > /dev/null; then
-    gem update "$@"
-  else
-    gem install "$@"
-    rbenv rehash
-  fi
-}
+#gem_install_or_update() {
+  #if gem list "$1" --installed > /dev/null; then
+    #gem update "$@"
+  #else
+    #gem install "$@"
+    #rbenv rehash
+  #fi
+#}
 
 fancy_echo "Updating apt cache ..."
 
-sudo add-apt-repository ppa:elementary-os/stable
-sudo add-apt-repository ppa:elementary-os/daily
-sudo add-apt-repository ppa:elementary-os/os-patches
-sudo add-apt-repository ppa:elementary-os/testing
-sudo add-apt-repository ppa:mpstark/elementary-tweaks-daily
-sudo apt update
-sudo apt dist-upgrade
-sudo apt install elementary-theme elementary-icon-theme elementary-default-settings elementary-desktop elementary-tweaks
-sudo echo "deb http://packages.elementary.io/appcenter xenial main
-# deb-src http://packages.elementary.io/appcenter xenial main" >> /etc/apt/sources.list.d/appCenter.list
-wget -O - http://packages.elementary.io/key.asc | sudo apt-key add -
-sudo apt update
-sudo apt install -y build-essential ctags \
-  gcc \
-  git \
-  htop \
-  hub \
-  imagemagick \
-  node-build \
-  nodenv \
-  openssl \
-  rbenv \
-  ruby-build \
-  silversearcher-ag \
-  tmate \
-  tmux \
-  vim \
-  zsh
+#sudo add-apt-repository ppa:elementary-os/stable
+#sudo add-apt-repository ppa:elementary-os/daily
+#sudo add-apt-repository ppa:elementary-os/os-patches
+#sudo add-apt-repository ppa:elementary-os/testing
+#sudo add-apt-repository ppa:mpstark/elementary-tweaks-daily
+#sudo apt update
+#sudo apt dist-upgrade
+#sudo apt install elementary-theme elementary-icon-theme elementary-default-settings elementary-desktop elementary-tweaks
+#sudo echo "deb http://packages.elementary.io/appcenter xenial main
+## deb-src http://packages.elementary.io/appcenter xenial main" >> /etc/apt/sources.list.d/appCenter.list
+#wget -O - http://packages.elementary.io/key.asc | sudo apt-key add -
+#sudo apt update
+#sudo apt install -y build-essential ctags \
+  #gcc \
+  #git \
+  #htop \
+  #hub \
+  #imagemagick \
+  #node-build \
+  #nodenv \
+  #openssl \
+  #rbenv \
+  #ruby-build \
+  #silversearcher-ag \
+  #tmate \
+  #tmux \
+  #vim \
+  #xclip \
+  #zsh
 
-sudo snap install slack code --classic
-sudo snap install spotify google-chrome docker firefox
+#sudo snap install slack code --classic
+#sudo snap install spotify google-chrome docker firefox
 
-fancy_echo "Configuring Ruby ..."
-find_latest_ruby() {
-  rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
-}
+#fancy_echo "Configuring Ruby ..."
+#find_latest_ruby() {
+  #rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
+#}
 
-ruby_version="2.5.1"
-# shellcheck disable=SC2016
-append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
-eval "$(rbenv init -)"
+#ruby_version="2.5.1"
+## shellcheck disable=SC2016
+#append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
+#eval "$(rbenv init -)"
 
-append_to_zshrc 'eval "$(nodenv init -)"' 1
-eval "$(nodenv init -)"
+#append_to_zshrc 'eval "$(nodenv init -)"' 1
+#eval "$(nodenv init -)"
 
-if ! rbenv versions | grep -Fq "$ruby_version"; then
-  RUBY_CONFIGURE_OPTS=--with-openssl-dir=/usr/local/opt/openssl rbenv install -s "$ruby_version"
-fi
+#if ! rbenv versions | grep -Fq "$ruby_version"; then
+  #RUBY_CONFIGURE_OPTS=--with-openssl-dir=/usr/local/opt/openssl rbenv install -s "$ruby_version"
+#fi
 
-rbenv global "$ruby_version"
-rbenv shell "$ruby_version"
-gem update --system
-gem_install_or_update 'bundler'
-number_of_cores=$(sysctl -n hw.ncpu)
-bundle config --global jobs $((number_of_cores - 1))
+#rbenv global "$ruby_version"
+#rbenv shell "$ruby_version"
+#gem update --system
+#gem_install_or_update 'bundler'
+#number_of_cores=$(sysctl -n hw.ncpu)
+#bundle config --global jobs $((number_of_cores - 1))
