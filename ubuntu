@@ -85,33 +85,33 @@ fancy_echo "Updating apt cache ..."
 #sudo add-apt-repository ppa:elementary-os/os-patches
 #sudo add-apt-repository ppa:elementary-os/testing
 #sudo add-apt-repository ppa:mpstark/elementary-tweaks-daily
-#sudo apt update
-#sudo apt dist-upgrade
+sudo apt update
+sudo apt dist-upgrade
 #sudo apt install elementary-theme elementary-icon-theme elementary-default-settings elementary-desktop elementary-tweaks
 #sudo echo "deb http://packages.elementary.io/appcenter xenial main
 ## deb-src http://packages.elementary.io/appcenter xenial main" >> /etc/apt/sources.list.d/appCenter.list
 #wget -O - http://packages.elementary.io/key.asc | sudo apt-key add -
-#sudo apt update
-#sudo apt install -y build-essential ctags \
-  #gcc \
-  #git \
-  #htop \
-  #hub \
-  #imagemagick \
-  #node-build \
-  #nodenv \
-  #openssl \
-  #rbenv \
-  #ruby-build \
-  #silversearcher-ag \
-  #tmate \
-  #tmux \
-  #vim \
-  #xclip \
-  #zsh
+sudo apt update
+sudo apt install -y build-essential ctags \
+  gcc \
+  git \
+  htop \
+  hub \
+  imagemagick \
+  node-build \
+  nodenv \
+  openssl \
+  rbenv \
+  ruby-build \
+  silversearcher-ag \
+  tmate \
+  tmux \
+  vim \
+  xclip \
+  zsh
 
-#sudo snap install slack code --classic
-#sudo snap install spotify google-chrome docker firefox
+sudo snap install slack code --classic
+sudo snap install spotify google-chrome docker firefox
 
 #fancy_echo "Configuring Ruby ..."
 #find_latest_ruby() {
