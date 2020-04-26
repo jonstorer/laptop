@@ -92,23 +92,22 @@ sudo apt dist-upgrade
 ## deb-src http://packages.elementary.io/appcenter xenial main" >> /etc/apt/sources.list.d/appCenter.list
 #wget -O - http://packages.elementary.io/key.asc | sudo apt-key add -
 sudo apt update
-sudo apt install -y build-essential ctags \
+sudo apt install -y build-essential exuberant-ctags \
   gcc \
   git \
   htop \
   hub \
   imagemagick \
-  node-build \
-  nodenv \
   openssl \
-  rbenv \
-  ruby-build \
   silversearcher-ag \
   tmate \
   tmux \
   vim \
   xclip \
   zsh
+
+curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
+curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
 
 sudo snap install slack code --classic
 sudo snap install spotify google-chrome docker firefox
