@@ -58,17 +58,6 @@ update_shell() {
   sudo chsh -s "$shell_path" "$USER"
 }
 
-case "$SHELL" in
-  */zsh)
-    if [ "$(command -v zsh)" != '/usr/local/bin/zsh' ] ; then
-      update_shell
-    fi
-    ;;
-  *)
-    update_shell
-    ;;
-esac
-
 #gem_install_or_update() {
   #if gem list "$1" --installed > /dev/null; then
     #gem update "$@"
@@ -84,8 +73,21 @@ sudo apt update
 fancy_echo "Distro Upgrade"
 sudo apt dist-upgrade
 
-fancy_echo "Install CLIs"
+fancy_echo "Install"
 sudo apt install -y build-essential
+sudo apt install -y zsh
+
+case "$SHELL" in
+  */zsh)
+    if [ "$(command -v zsh)" != '/usr/local/bin/zsh' ] ; then
+      update_shell
+    fi
+    ;;
+  *)
+    update_shell
+    ;;
+esac
+
 sudo apt install -y exuberant-ctags
 sudo apt install -y gcc
 sudo apt install -y git
@@ -98,16 +100,15 @@ sudo apt install -y tmate
 sudo apt install -y tmux
 sudo apt install -y vim
 sudo apt install -y xclip
-sudo apt install -y zsh
 
 fancy_echo "Install nodenv"
-curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
 append_to_zshrc 'eval "$(nodenv init -)"' 1
+curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
 eval "$(nodenv init -)"
 
 fancy_echo "Install rbenv"
-curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
 append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
+curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
 eval "$(rbenv init -)"
 
 sudo snap install slack --classic
