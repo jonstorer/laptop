@@ -4,6 +4,15 @@
 # Be prepared to turn your laptop (or desktop, no haters here)
 # into an awesome development machine.
 
+#gem_install_or_update() {
+  #if gem list "$1" --installed > /dev/null; then
+    #gem update "$@"
+  #else
+    #gem install "$@"
+    #rbenv rehash
+  #fi
+#}
+
 fancy_echo() {
   local fmt="$1"; shift
 
@@ -46,28 +55,7 @@ fi
 # shellcheck disable=SC2016
 append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
 
-update_shell() {
-  local shell_path;
-  shell_path="$(command -v zsh)"
-
-  fancy_echo "Changing your shell to zsh ..."
-  if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-    fancy_echo "Adding '$shell_path' to /etc/shells"
-    sudo sh -c "echo $shell_path >> /etc/shells"
-  fi
-  sudo chsh -s "$shell_path" "$USER"
-}
-
-#gem_install_or_update() {
-  #if gem list "$1" --installed > /dev/null; then
-    #gem update "$@"
-  #else
-    #gem install "$@"
-    #rbenv rehash
-  #fi
-#}
-
-fancy_echo "Updating apt cache ..."
+fancy_echo "Update Apt Cache"
 sudo apt update
 
 fancy_echo "Distro Upgrade"
@@ -77,16 +65,15 @@ fancy_echo "Install"
 sudo apt install -y build-essential
 sudo apt install -y zsh
 
-case "$SHELL" in
-  */zsh)
-    if [ "$(command -v zsh)" != '/usr/local/bin/zsh' ] ; then
-      update_shell
-    fi
-    ;;
-  *)
-    update_shell
-    ;;
-esac
+local shell_path;
+shell_path="$(command -v zsh)"
+
+fancy_echo "Changing your shell to zsh ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+  fancy_echo "Adding '$shell_path' to /etc/shells"
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+sudo chsh -s "$shell_path" "$USER"
 
 sudo apt install -y exuberant-ctags
 sudo apt install -y gcc
@@ -114,7 +101,7 @@ eval "$(rbenv init -)"
 sudo snap install slack --classic
 sudo snap install code --classic
 sudo snap install spotify
-sudo snap install google-chrome
+sudo snap install chromium
 sudo snap install docker
 
 #sudo add-apt-repository ppa:elementary-os/stable
