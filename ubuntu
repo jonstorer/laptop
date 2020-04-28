@@ -39,6 +39,13 @@ append_to_zshrc() {
   fi
 }
 
+apt_install() {
+  local package="$1";
+
+  echo "\nInstalling $package\n"
+  sudo apt install -y $package
+}
+
 # shellcheck disable=SC2154
 #trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 
@@ -51,11 +58,11 @@ fancy_echo "Distro Upgrade"
 sudo apt dist-upgrade
 
 fancy_echo "Install"
-sudo apt install -y build-essential
-sudo apt install -y zsh
+apt_isntall build-essential
+apt_isntall zsh
 #sudo apt install -y exuberant-ctags
 #sudo apt install -y gcc
-#sudo apt install -y git
+apt_isntall git
 #sudo apt install -y htop
 #sudo apt install -y hub
 #sudo apt install -y imagemagick
