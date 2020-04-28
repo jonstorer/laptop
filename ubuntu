@@ -17,9 +17,9 @@ fancy_echo() {
   local fmt="$1"; shift
 
   # shellcheck disable=SC2059
-  printf "\n\n******************\n\n" "$@"
-  printf "\n$fmt\n" "$@"
-  printf "\n\n******************\n\n" "$@"
+  printf "\n\n******************\n" "$@"
+  printf "$fmt" "$@"
+  printf "\n******************\n\n" "$@"
 }
 
 append_to_zshrc() {
@@ -44,7 +44,7 @@ append_to_zshrc() {
 apt_install() {
   local package="$1";
 
-  fancy_echo "\nInstalling $package\n"
+  fancy_echo "Installing $package"
   sudo apt install -y $package
 }
 
@@ -59,7 +59,6 @@ sudo apt update
 fancy_echo "Distro Upgrade"
 sudo apt dist-upgrade
 
-fancy_echo "Install"
 apt_install build-essential
 apt_install zsh
 #sudo apt install -y exuberant-ctags
@@ -104,6 +103,11 @@ append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
 
 shell_path="$(command -v zsh)"
 fancy_echo "Changing your shell to zsh at '$shell_path' ..."
+echo "****************"
+echo "****************"
+cat /etc/shells
+echo "****************"
+echo "****************"
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   fancy_echo "Adding '$shell_path' to /etc/shells"
   sudo sh -c "echo $shell_path >> /etc/shells"
