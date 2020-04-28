@@ -107,7 +107,7 @@ if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   fancy_echo "Adding '$shell_path' to /etc/shells"
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
-sudo chsh -s "$shell_path"
+chsh -s "$shell_path"
 
 fancy_echo "Installing rbenv"
 append_to_zshrc 'export PATH="$HOME/.rbenv/bin:$PATH"'
