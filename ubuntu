@@ -103,29 +103,26 @@ append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
 
 shell_path="$(command -v zsh)"
 fancy_echo "Changing your shell to zsh at '$shell_path' ..."
-echo "****************"
-echo "****************"
-cat /etc/shells
-echo "****************"
-echo "****************"
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   fancy_echo "Adding '$shell_path' to /etc/shells"
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
 sudo chsh -s "$shell_path"
 
-$shell_path
-
 fancy_echo "Installing rbenv"
 append_to_zshrc 'export PATH="$HOME/.rbenv/bin:$PATH"'
 append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
-curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
+curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | $shell_path
+
+PATH="$HOME/.rbenv/bin:$PATH"
 eval "$(rbenv init -)"
 
 fancy_echo "Install nodenv"
 append_to_zshrc 'export PATH="$HOME/.nodenv/bin:$PATH"'
 append_to_zshrc 'eval "$(nodenv init -)"' 1
-curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
+curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | $shell_path
+
+PATH="$HOME/.nodenv/bin:$PATH"
 eval "$(nodenv init -)"
 
 #fancy_echo "Configuring Ruby ..."
