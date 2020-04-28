@@ -44,17 +44,6 @@ append_to_zshrc() {
 
 #set -e
 
-if [ ! -d "$HOME/.bin/" ]; then
-  mkdir "$HOME/.bin"
-fi
-
-if [ ! -f "$HOME/.zshrc" ]; then
-  touch "$HOME/.zshrc"
-fi
-
-# shellcheck disable=SC2016
-append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
-
 fancy_echo "Update Apt Cache"
 sudo apt update
 
@@ -93,6 +82,17 @@ sudo apt install -y zsh
 ## deb-src http://packages.elementary.io/appcenter xenial main" >> /etc/apt/sources.list.d/appCenter.list
 #wget -O - http://packages.elementary.io/key.asc | sudo apt-key add -
 
+if [ ! -d "$HOME/.bin/" ]; then
+  mkdir "$HOME/.bin"
+fi
+
+if [ ! -f "$HOME/.zshrc" ]; then
+  touch "$HOME/.zshrc"
+fi
+
+# shellcheck disable=SC2016
+append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
+
 shell_path="$(command -v zsh)"
 fancy_echo "Changing your shell to zsh at '$shell_path' ..."
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
@@ -100,6 +100,7 @@ if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
 sudo chsh -s "$shell_path"
+eval "$shell_path"
 
 #fancy_echo "Install rbenv"
 #append_to_zshrc 'export PATH="$HOME/.rbenv/bin:$PATH"'
