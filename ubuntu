@@ -81,8 +81,8 @@ apt_install tmux
 apt_install vim
 apt_install xclip
 
-snap_install slack --classic
-snap_install code --classic
+snap_install "slack --classic"
+snap_install "code --classic"
 snap_install spotify
 snap_install chromium
 snap_install docker
