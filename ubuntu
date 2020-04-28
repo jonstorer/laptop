@@ -4,14 +4,14 @@
 # Be prepared to turn your laptop (or desktop, no haters here)
 # into an awesome development machine.
 
-#gem_install_or_update() {
-  #if gem list "$1" --installed > /dev/null; then
-    #gem update "$@"
-  #else
-    #gem install "$@"
-    #rbenv rehash
-  #fi
-#}
+gem_install_or_update() {
+  if gem list "$1" --installed > /dev/null; then
+    gem update "$@"
+  else
+    gem install "$@"
+    rbenv rehash
+  fi
+}
 
 fancy_echo() {
   local fmt="$1"; shift
@@ -55,6 +55,13 @@ snap_install() {
   sudo snap install $package
 }
 
+c_snap_install() {
+  local package="$1";
+
+  fancy_echo "Installing $package"
+  sudo snap install $package --clasic
+}
+
 # shellcheck disable=SC2154
 #trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 
@@ -81,8 +88,8 @@ apt_install tmux
 apt_install vim
 apt_install xclip
 
-snap_install "slack --classic"
-snap_install "code --classic"
+c_snap_install slack
+c_snap_install code
 snap_install spotify
 snap_install chromium
 snap_install docker
@@ -132,21 +139,21 @@ PATH="$HOME/.nodenv/shims:$PATH"
 curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
 eval "$(nodenv init -)"
 
-#fancy_echo "Configuring Ruby ..."
-#find_latest_ruby() {
-  #rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
-#}
+fancy_echo "Configuring Ruby ..."
+find_latest_ruby() {
+  rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
+}
 
-#ruby_version="2.5.1"
+ruby_version=find_latest_ruby
 ## shellcheck disable=SC2016
 
-#if ! rbenv versions | grep -Fq "$ruby_version"; then
-  #RUBY_CONFIGURE_OPTS=--with-openssl-dir=/usr/local/opt/openssl rbenv install -s "$ruby_version"
-#fi
+if ! rbenv versions | grep -Fq "$ruby_version"; then
+  RUBY_CONFIGURE_OPTS=--with-openssl-dir=/usr/local/opt/openssl rbenv install -s "$ruby_version"
+fi
 
-#rbenv global "$ruby_version"
-#rbenv shell "$ruby_version"
-#gem update --system
-#gem_install_or_update 'bundler'
-#number_of_cores=$(sysctl -n hw.ncpu)
-#bundle config --global jobs $((number_of_cores - 1))
+rbenv global "$ruby_version"
+rbenv shell "$ruby_version"
+gem update --system
+gem_install_or_update 'bundler'
+number_of_cores=$(sysctl -n hw.ncpu)
+bundle config --global jobs $((number_of_cores - 1))
