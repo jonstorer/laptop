@@ -42,7 +42,7 @@ append_to_zshrc() {
 apt_install() {
   local package="$1";
 
-  echo "\nInstalling $package\n"
+  fancy_echo "\nInstalling $package\n"
   sudo apt install -y $package
 }
 
@@ -108,7 +108,7 @@ if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
 fi
 sudo chsh -s "$shell_path"
 
-eval "$shell_path"
+$shell_path
 
 fancy_echo "Install rbenv"
 append_to_zshrc 'export PATH="$HOME/.rbenv/bin:$PATH"'
