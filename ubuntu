@@ -58,11 +58,11 @@ fancy_echo "Distro Upgrade"
 sudo apt dist-upgrade
 
 fancy_echo "Install"
-apt_isntall build-essential
-apt_isntall zsh
+apt_install build-essential
+apt_install zsh
 #sudo apt install -y exuberant-ctags
 #sudo apt install -y gcc
-apt_isntall git
+apt_install git
 #sudo apt install -y htop
 #sudo apt install -y hub
 #sudo apt install -y imagemagick
