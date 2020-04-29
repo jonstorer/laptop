@@ -155,5 +155,5 @@ rbenv global "$ruby_version"
 rbenv shell "$ruby_version"
 gem update --system
 gem_install_or_update 'bundler'
-number_of_cores=$(sysctl -n hw.ncpu)
+number_of_cores=$([ "$(uname)" -eq "Darwin" ] &&  $(sysctl -n hw.ncpu) ||  $(nproc));
 bundle config --global jobs $((number_of_cores - 1))
