@@ -59,7 +59,7 @@ c_snap_install() {
   local package="$1";
 
   fancy_echo "Installing $package"
-  sudo snap install $package --clasic
+  sudo snap install $package --classic
 }
 
 # shellcheck disable=SC2154
