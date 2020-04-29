@@ -133,16 +133,7 @@ PATH="$HOME/.rbenv/shims:$PATH"
 curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
 eval "$(rbenv init -)"
 
-rbenv --help
-
-
-#fancy_echo "Installing ruby-build"
-
-#git clone https://github.com/rbenv/ruby-build.git
-#PREFIX=/usr/local ./ruby-build/install.sh
-
-#mkdir -p "$(rbenv root)"/plugins
-#git clone https://github.com/rbenv/ruby-build.git "$(rbenv root)"/plugins/ruby-build
+rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
 
 fancy_echo "Install nodenv"
 append_to_zshrc 'export PATH="$HOME/.nodenv/bin:$PATH"'
@@ -153,11 +144,7 @@ curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/
 eval "$(nodenv init -)"
 
 fancy_echo "Configuring Ruby ..."
-find_latest_ruby() {
-  rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
-}
-
-ruby_version=find_latest_ruby
+ruby_version=$(rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//')
 ## shellcheck disable=SC2016
 
 if ! rbenv versions | grep -Fq "$ruby_version"; then
