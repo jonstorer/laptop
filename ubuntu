@@ -148,7 +148,7 @@ ruby_version=$(rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//')
 ## shellcheck disable=SC2016
 
 if ! rbenv versions | grep -Fq "$ruby_version"; then
-  RUBY_CONFIGURE_OPTS=--with-openssl-dir=/usr/local/opt/openssl rbenv install -s "$ruby_version"
+  RUBY_CONFIGURE_OPTS=--with-openssl-dir=$(command -v openssl) rbenv install -s "$ruby_version"
 fi
 
 rbenv global "$ruby_version"
