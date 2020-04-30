@@ -1,8 +1,3 @@
-LegalShield
-===========
-
-[Instructions for use at LegalShield](INSTALL.md)
-
 Laptop
 ======
 
@@ -20,6 +15,7 @@ We support:
 * macOS Mavericks (10.9)
 * macOS Yosemite (10.10)
 * macOS El Capitan (10.11)
+* Ubuntu (20.04)
 
 Older versions may work but aren't regularly tested. Bug reports for older
 versions are welcome.
@@ -29,15 +25,35 @@ Install
 
 Download, review, then execute the script:
 
+#### Mac
+
 ```sh
-curl --remote-name https://raw.githubusercontent.com/legalshield/laptop/master/mac
+curl --remote-name https://raw.githubusercontent.com/jonstorer/laptop/master/mac
 less mac
 sh mac 2>&1 | tee ~/laptop.log
 ```
+###### One Line
 
-Optionally, [install thoughtbot/dotfiles][dotfiles].
+```sh
+curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/master/mac' | sh
+```
 
-[dotfiles]: https://github.com/thoughtbot/dotfiles#install
+#### Linux
+
+```sh
+curl --remote-name https://raw.githubusercontent.com/jonstorer/laptop/master/ubuntu
+less ubuntu
+sh ubuntu 2>&1 | tee ~/laptop.log
+```
+###### One Line
+
+```sh
+curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/master/ubuntu' | sh
+```
+
+Optionally, [install jonstorer/dotfiles][dotfiles].
+
+[dotfiles]: https://github.com/jonstorer/dotfiles#install
 
 Debugging
 ---------
@@ -45,7 +61,7 @@ Debugging
 Your last Laptop run will be saved to `~/laptop.log`.
 Read through it to see if you can debug the issue yourself.
 If not, copy the lines where the script failed into a
-[new GitHub Issue](https://github.com/thoughtbot/laptop/issues/new) for us.
+[new GitHub Issue](https://github.com/jonstorer/laptop/issues/new) for us.
 Or, attach the whole log file as an attachment.
 
 What it sets up

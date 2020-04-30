@@ -92,11 +92,11 @@ apt_install tmux
 apt_install vim
 apt_install xclip
 
-#c_snap_install slack
-#c_snap_install code
-#snap_install spotify
-#snap_install chromium
-#snap_install docker
+c_snap_install slack
+c_snap_install code
+snap_install spotify
+snap_install chromium
+snap_install docker
 
 #sudo add-apt-repository ppa:elementary-os/stable
 #sudo add-apt-repository ppa:elementary-os/daily
