@@ -80,15 +80,17 @@ apt_install zsh
 apt_install exuberant-ctags
 apt_install gcc
 apt_install git
-#apt_install htop
-#apt_install hub
-#apt_install imagemagick
+apt_install htop
+apt_install hub
+apt_install imagemagick
 apt_install openssl
-#apt_install silversearcher-ag
-#apt_install tmate
-#apt_install tmux
+apt_install libssl-dev
+apt_install zlib1g-dev
+apt_install silversearcher-ag
+apt_install tmate
+apt_install tmux
 apt_install vim
-#apt_install xclip
+apt_install xclip
 
 #c_snap_install slack
 #c_snap_install code
@@ -148,12 +150,12 @@ ruby_version=$(rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//')
 ## shellcheck disable=SC2016
 
 if ! rbenv versions | grep -Fq "$ruby_version"; then
-  RUBY_CONFIGURE_OPTS=--with-openssl-dir=$(command -v openssl) rbenv install -s "$ruby_version"
+  rbenv install -s "$ruby_version"
 fi
 
 rbenv global "$ruby_version"
 rbenv shell "$ruby_version"
 gem update --system
 gem_install_or_update 'bundler'
-number_of_cores=$([ "$(uname)" -eq "Darwin" ] &&  $(sysctl -n hw.ncpu) ||  $(nproc));
+number_of_cores=$(nproc);
 bundle config --global jobs $((number_of_cores - 1))
