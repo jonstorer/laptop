@@ -69,6 +69,10 @@ c_snap_install() {
 
 #set -e
 
+fancy_echo "Adding Teamview Repository"
+curl -fsSL https://download.teamviewer.com/download/linux/signature/TeamViewer2017.asc | sudo apt-key add -
+sudo add-apt-repository 'deb http://linux.teamviewer.com/deb stable main'
+
 fancy_echo "Update Apt Cache"
 sudo apt update
 
@@ -82,21 +86,22 @@ apt_install gcc
 apt_install git
 apt_install htop
 apt_install hub
-apt_install imagemagick
+#apt_install imagemagick
 apt_install openssl
 apt_install libssl-dev
 apt_install zlib1g-dev
-apt_install silversearcher-ag
-apt_install tmate
-apt_install tmux
+#apt_install silversearcher-ag
+#apt_install tmate
+#apt_install tmux
 apt_install vim
-apt_install xclip
+#apt_install xclip
+apt_install teamviewer
 
-c_snap_install slack
-c_snap_install code
-snap_install spotify
-snap_install chromium
-snap_install docker
+#c_snap_install slack
+#c_snap_install code
+#snap_install spotify
+#snap_install chromium
+#snap_install docker
 
 #sudo add-apt-repository ppa:elementary-os/stable
 #sudo add-apt-repository ppa:elementary-os/daily
@@ -127,35 +132,35 @@ if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
 fi
 sudo chsh -s "$shell_path" $USER
 
-fancy_echo "Installing rbenv"
-append_to_zshrc 'export PATH="$HOME/.rbenv/bin:$PATH"'
-append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
-PATH="$HOME/.rbenv/bin:$PATH"
-PATH="$HOME/.rbenv/shims:$PATH"
-curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
-eval "$(rbenv init -)"
+#fancy_echo "Installing rbenv"
+#append_to_zshrc 'export PATH="$HOME/.rbenv/bin:$PATH"'
+#append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
+#PATH="$HOME/.rbenv/bin:$PATH"
+#PATH="$HOME/.rbenv/shims:$PATH"
+#curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
+#eval "$(rbenv init -)"
 
-rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
+#rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//'
 
-fancy_echo "Install nodenv"
-append_to_zshrc 'export PATH="$HOME/.nodenv/bin:$PATH"'
-append_to_zshrc 'eval "$(nodenv init -)"' 1
-PATH="$HOME/.nodenv/bin:$PATH"
-PATH="$HOME/.nodenv/shims:$PATH"
-curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
-eval "$(nodenv init -)"
+#fancy_echo "Install nodenv"
+#append_to_zshrc 'export PATH="$HOME/.nodenv/bin:$PATH"'
+#append_to_zshrc 'eval "$(nodenv init -)"' 1
+#PATH="$HOME/.nodenv/bin:$PATH"
+#PATH="$HOME/.nodenv/shims:$PATH"
+#curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
+#eval "$(nodenv init -)"
 
-fancy_echo "Configuring Ruby ..."
-ruby_version=$(rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//')
+#fancy_echo "Configuring Ruby ..."
+#ruby_version=$(rbenv install -l | grep -v - | tail -1 | sed -e 's/^ *//')
 ## shellcheck disable=SC2016
 
-if ! rbenv versions | grep -Fq "$ruby_version"; then
-  rbenv install -s "$ruby_version"
-fi
+#if ! rbenv versions | grep -Fq "$ruby_version"; then
+  #rbenv install -s "$ruby_version"
+#fi
 
-rbenv global "$ruby_version"
-rbenv shell "$ruby_version"
-gem update --system
-gem_install_or_update 'bundler'
-number_of_cores=$(nproc);
-bundle config --global jobs $((number_of_cores - 1))
+#rbenv global "$ruby_version"
+#rbenv shell "$ruby_version"
+#gem update --system
+#gem_install_or_update 'bundler'
+#number_of_cores=$(nproc);
+#bundle config --global jobs $((number_of_cores - 1))
