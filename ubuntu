@@ -17,9 +17,9 @@ fancy_echo() {
   local msg="$1"; shift
 
   # shellcheck disable=SC2059
-  printf "\n********\n" "$@"
-  printf "$msg" "$@"
-  printf "\n********\n\n" "$@"
+  printf "\n**\n" "$@"
+  printf "** $msg" "$@"
+  printf "\n**\n\n" "$@"
 }
 
 append_to_zshrc() {
@@ -38,6 +38,18 @@ append_to_zshrc() {
     else
       printf "\n%s\n" "$text" >> "$zshrc"
     fi
+  fi
+}
+
+upsert_teamviewer_repository() {
+  if ! grep -q "TeamViewer" $(apt-key list); then
+    fancy_echo "Add Teamviewer Key"
+    curl -fsSL https://download.teamviewer.com/download/linux/signature/TeamViewer2017.asc | sudo apt-key add -
+  fi
+
+  if ! grep -q "teamviewer.com" /etc/apt/sources.list > /dev/null 2>&1 ; then
+    fancy_echo "Add Teamviewer Repository"
+    sudo add-apt-repository 'deb http://linux.teamviewer.com/deb stable main'
   fi
 }
 
@@ -69,9 +81,7 @@ c_snap_install() {
 
 #set -e
 
-fancy_echo "Adding Teamview Repository"
-curl -fsSL https://download.teamviewer.com/download/linux/signature/TeamViewer2017.asc | sudo apt-key add -
-sudo add-apt-repository 'deb http://linux.teamviewer.com/deb stable main'
+upsert_teamviewer_repository
 
 fancy_echo "Update Apt Cache"
 sudo apt update
@@ -96,10 +106,7 @@ apt_install tmux
 apt_install vim
 apt_install xclip
 apt_install teamviewer
-
-fancy_echo "Configure Teamviewer to run on start"
 sudo teamviewer daemon enable
-sudo teamviewer daemon status | head
 
 c_snap_install slack
 c_snap_install code
