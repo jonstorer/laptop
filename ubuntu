@@ -42,7 +42,8 @@ append_to_zshrc() {
 }
 
 upsert_teamviewer_repository() {
-  if ! grep -q "TeamViewer" $(apt-key list); then
+  local key_list=$(apt-key list);
+  if ! grep -q "TeamViewer" $key_list; then
     fancy_echo "Add Teamviewer Key"
     curl -fsSL https://download.teamviewer.com/download/linux/signature/TeamViewer2017.asc | sudo apt-key add -
   fi
