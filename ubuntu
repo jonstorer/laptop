@@ -97,6 +97,10 @@ apt_install vim
 #apt_install xclip
 apt_install teamviewer
 
+fancy_echo "Configure Teamviewer to run on start"
+sudo teamviewer daemon enable
+sudo teamviewer daemon status | head
+
 #c_snap_install slack
 #c_snap_install code
 #snap_install spotify
