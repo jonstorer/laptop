@@ -127,7 +127,7 @@ cask "rectangle"     unless File.exist?("/Applications/Rectangle.app")
 cask "docker"        unless File.exist?("/Applications/Docker.app")
 cask "vagrant"       unless system("which vagrant /dev/null 2>&1")
 
-# CLIs
+# Unix
 brew "ctags"
 brew "git"
 brew "openssl"
@@ -141,6 +141,8 @@ brew "gcc"
 brew "htop"
 brew "watch"
 brew "hub"
+brew "gnu-sed"
+brew "grep"
 brew "nodenv"
 brew "node-build"
 brew "rbenv"
