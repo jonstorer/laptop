@@ -113,25 +113,25 @@ brew update
 brew tap Homebrew/bundle
 brew bundle --file=- <<EOF
 tap "homebrew/services"
-tap "AdoptOpenJDK/openjdk"
+#tap "AdoptOpenJDK/openjdk"
 
 # Casks
-cask "adoptopenjdk/openjdk/adoptopenjdk8"
+#cask "adoptopenjdk/openjdk/adoptopenjdk8"
 cask "alfred"
 cask "firefox"
 cask "google-chrome"
 cask "skitch"
 cask "slack"
 cask "iterm2"
-cask "skype-for-business"
+#cask "skype-for-business"
 cask "macdown"
-cask "textmate"
-cask "pgadmin4"
-cask "pg-commander"
-cask "visual-studio-code"
+#cask "textmate"
+#cask "pgadmin4"
+#cask "pg-commander"
+#cask "visual-studio-code"
 
 # Extra
-cask "spectacle"
+#cask "spectacle"
 
 # Unix
 brew "ctags"
@@ -146,9 +146,11 @@ brew "tmate"
 brew "gcc"
 brew "htop"
 brew "watch"
-brew "postgresql@9.6"
-brew "elasticsearch"
-brew "redis"
+brew "gnu-sed", args: [ "--with-default-names" ]
+brew "grep", args: [ "--with-default-names" ]
+#brew "postgresql@9.6"
+#brew "elasticsearch"
+#brew "redis"
 
 # Docker
 cask "docker"
@@ -158,13 +160,13 @@ cask "vagrant"
 brew "hub"
 
 # Image manipulation
-brew "imagemagick"
+#brew "imagemagick"
 
 # Testing
 # brew "qt" # not currently supported on Sierra
 
 # Programming languages
-brew "maven"
+#brew "maven"
 brew "nodenv"
 brew "node-build"
 brew "rbenv"
