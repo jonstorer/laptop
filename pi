@@ -60,7 +60,11 @@ apt_install libssl-dev
 apt_install zlib1g-dev
 apt_install tmux
 apt_install vim
+apt_install python3-pip
+apt_install libffi-dev
 apt_install docker.io
+
+sudo pip3 install docker-compose
 
 sudo systemctl enable ssh
 sudo systemctl start ssh
