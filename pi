@@ -51,6 +51,7 @@ sudo apt dist-upgrade
 apt_install build-essential
 apt_install gcc
 apt_install zsh
+apt_install silversearcher-ag
 apt_install git
 apt_install htop
 apt_install hub
