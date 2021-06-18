@@ -125,7 +125,7 @@ cask "macdown"       unless File.exist?("/Applications/MacDown.app")
 cask "textmate"      unless File.exist?("/Applications/TextMate.app")
 cask "rectangle"     unless File.exist?("/Applications/Rectangle.app")
 cask "docker"        unless File.exist?("/Applications/Docker.app")
-cask "vagrant"       unless system("which vagrant /dev/null 2>&1")
+cask "vagrant"       unless system("which vagrant")
 
 # Unix
 brew "ctags"
