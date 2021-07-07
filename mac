@@ -130,6 +130,7 @@ cask "vagrant"       unless system("which vagrant")
 # Unix
 brew "ctags"
 brew "git"
+brew "gnupg2"
 brew "openssl"
 brew "reattach-to-user-namespace"
 brew "the_silver_searcher"
