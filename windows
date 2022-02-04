@@ -1,0 +1,26 @@
+(new-object System.Net.WebClient).DownloadFile('http://www.xyz.net/file.txt','C:\tmp\file.txt')
+
+
+
+Set-ExecutionPolicy Bypass -Scope Process -Forc;
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+try {
+  If(-Not Get-Command choco){
+    “$command exists”
+  }
+}
+
+#if ! command -v brew >/dev/null; then
+#  fancy_echo "Installing Homebrew ..."
+#    curl -fsS \
+#      'https://raw.githubusercontent.com/Homebrew/install/master/install' | ruby
+#
+#    append_to_zshrc '# recommended by brew doctor'
+#
+#    # shellcheck disable=SC2016
+#    append_to_zshrc 'export PATH="/usr/local/bin:$PATH"' 1
+#
+#    export PATH="/usr/local/bin:$PATH"
+#fi

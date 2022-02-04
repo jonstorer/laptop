@@ -1,0 +1,90 @@
+#!/bin/sh
+
+# Welcome to the raspberry pi setup script!
+
+fancy_echo() {
+  local msg="$1"; shift
+
+  printf "\n**\n" "$@"
+  printf "** $msg" "$@"
+  printf "\n**\n\n" "$@"
+}
+
+append_to_zshrc() {
+  local text="$1" zshrc
+  local skip_new_line="${2:-0}"
+
+  if [ -w "$HOME/.zshrc.local" ]; then
+    zshrc="$HOME/.zshrc.local"
+  else
+    zshrc="$HOME/.zshrc"
+  fi
+
+  if ! grep -Fqs "$text" "$zshrc"; then
+    if [ "$skip_new_line" -eq 1 ]; then
+      printf "%s\n" "$text" >> "$zshrc"
+    else
+      printf "\n%s\n" "$text" >> "$zshrc"
+    fi
+  fi
+}
+
+apt_install() {
+  local package="$1";
+
+  fancy_echo "Installing $package"
+  sudo apt install -y $package
+}
+
+trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+set -e
+
+fancy_echo "Update Apt Cache"
+sudo apt update
+
+fancy_echo "Upgrade Installed Packages"
+sudo apt upgrade
+
+fancy_echo "Upgrade Distro"
+sudo apt dist-upgrade
+
+apt_install build-essential
+apt_install gcc
+apt_install zsh
+apt_install silversearcher-ag
+apt_install git
+apt_install htop
+apt_install hub
+apt_install openssh-server
+apt_install openssl
+apt_install libssl-dev
+apt_install zlib1g-dev
+apt_install tmux
+apt_install vim
+apt_install python3-pip
+apt_install libffi-dev
+apt_install docker.io
+
+sudo pip3 install docker-compose
+
+sudo systemctl enable ssh
+sudo systemctl start ssh
+
+sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+sudo iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
+sudo iptables-save
+
+if [ ! -d "$HOME/.bin/" ]; then mkdir "$HOME/.bin"; fi
+if [ ! -f "$HOME/.zshrc" ]; then touch "$HOME/.zshrc"; fi
+
+append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
+
+shell_path="$(command -v zsh)"
+fancy_echo "Changing your shell to zsh at '$shell_path' ..."
+
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+  fancy_echo "Adding '$shell_path' to /etc/shells"
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+
+sudo chsh -s "$shell_path" $USER
