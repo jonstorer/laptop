@@ -1,0 +1,82 @@
+Write-Host "Running laptop script..."
+
+
+If(-Not (Get-Command choco -errorAction SilentlyContinue)){
+  Write-Host "Installing Chocolatey ..."
+  Invoke-RestMethod -Uri https://community.chocolatey.org/install.ps1 | Invoke-Expression
+}
+
+choco upgrade chocolatey
+
+# Command line utils
+
+Write-Host "Installing Command Line Utilities ..."
+choco install openssl git
+
+# everything below here is just notes for later
+
+
+
+
+#  DotNet4.5.2 tsqllint dotnet4.7.2 netfx-4.7.2-devpack
+
+# Write-Host "Installing Windowed Apps ..."
+# choco install 7zip ^
+#               docker ^
+#               vim ^
+#               PowerShell ^
+#               sql-server-management-studio ^
+#               visualstudio2017enterprise ^
+#               visualstudio2019enterprise ^
+#               visualstudio2022enterprise ^
+#
+# Write-Host "Installing Services ..."
+# choco install memcached ^
+#               sql-server-2019 ^
+
+# function Choco-Upstall ([string]$package) {
+#   If (-Not (choco info -r $package)){
+#     choco install -y $package
+#   } Else {
+#     choco upgrade -y $package
+#   }
+# }
+
+
+#choco install dotnet
+#choco install alfred
+#choco install dotnet
+#choco install firefox
+#choco install google-chrome
+#choco install skitch
+#choco install slack
+#choco install iterm2
+#choco install macdown
+#choco install textmate
+#choco install rectangle
+#choco install spectacle
+#choco install docker
+#choco install vagrant
+#choco install postman
+#choco install ctags
+#choco install gnupg2
+#choco install openssl
+#choco install reattach-to-user-namespace
+#choco install the_silver_searcher
+#choco install tmux
+#choco install vim
+#choco install zsh
+#choco install tmate
+#choco install gcc
+#choco install htop
+#choco install watch
+#choco install hub
+#choco install gnu-sed
+#choco install grep
+#choco install nodenv
+#choco install node-build
+#choco install rbenv
+#choco install ruby-build
+#choco install rename
+#choco install java
+

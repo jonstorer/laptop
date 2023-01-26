@@ -10,13 +10,13 @@ based on what is already installed on the machine.
 Requirements
 ------------
 
-We support:
+Support For:
 
 * macOs Catalina 10.15
 * macOs Big Sur  11
 * macOs Monterey 12
 * Ubuntu 20.04
-* Windows 10
+* Windows 11
 
 Older versions may work but aren't regularly tested.
 Bug reports for older versions are welcome.
@@ -29,20 +29,18 @@ Download, review, then execute the script:
 #### Mac
 
 ```sh
-curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/master/mac' | sh
+curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac' | sh
 ```
 #### Linux
 
 ```sh
-curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/master/ubuntu' | sh
+curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
 ```
 
 #### Windows
 
 ```ps1
-Set-ExecutionPolicy Bypass -Scope Process -Forc;
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+Invoke-RestMethod -Uri https://raw.githubusercontent.com/jonstorer/laptop/main/windows | Invoke-Expression
 ```
 
 Debugging

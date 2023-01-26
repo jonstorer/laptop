@@ -1,26 +1,14 @@
-(new-object System.Net.WebClient).DownloadFile('http://www.xyz.net/file.txt','C:\tmp\file.txt')
+Write-Host "Running laptop script..."
 
 
-
-Set-ExecutionPolicy Bypass -Scope Process -Forc;
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
-try {
-  If(-Not Get-Command choco){
-    “$command exists”
-  }
+If(-Not (Get-Command choco -errorAction SilentlyContinue)){
+  Write-Host "Installing Chocolatey ..."
+  Invoke-RestMethod -Uri https://community.chocolatey.org/install.ps1 | Invoke-Expression
 }
 
-#if ! command -v brew >/dev/null; then
-#  fancy_echo "Installing Homebrew ..."
-#    curl -fsS \
-#      'https://raw.githubusercontent.com/Homebrew/install/master/install' | ruby
-#
-#    append_to_zshrc '# recommended by brew doctor'
-#
-#    # shellcheck disable=SC2016
-#    append_to_zshrc 'export PATH="/usr/local/bin:$PATH"' 1
-#
-#    export PATH="/usr/local/bin:$PATH"
-#fi
+choco upgrade chocolatey
+
+# Command line utils
+
+Write-Host "Installing Command Line Utilities ..."
+choco install openssl git
