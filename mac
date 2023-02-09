@@ -110,8 +110,7 @@ cask "dotnet"
 cask "visual-studio"
 cask "visual-studio-code"
 cask "microsoft-teams"
-
-
+cask "powershell"
 
 # Mac Casks
 cask "alfred"
@@ -123,22 +122,19 @@ cask "iterm2"
 cask "macdown"
 cask "textmate"
 cask "rectangle"
-cask "spectacle"
 cask "docker"
 cask "vagrant"
 cask "postman"
 cask "spotify"
 cask "karabiner"
 
-# Libraries
+# Libraries & Tools
 brew "ctags"
 brew "gnupg2"
 brew "openssl"
 brew "reattach-to-user-namespace"
 brew "gcc"
 brew "gnu-sed"
-
-# Tools
 brew "git"
 brew "hub"
 brew "htop"
@@ -164,9 +160,6 @@ brew "ruby-build"
 
 brew "java"
 brew "maven"
-
-
-
 
 EOF
 
