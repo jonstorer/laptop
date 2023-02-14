@@ -114,9 +114,7 @@ cask "powershell"
 
 # Mac Casks
 cask "alfred"
-cask "firefox"
 cask "google-chrome"
-cask "skitch"
 cask "slack"
 cask "iterm2"
 cask "macdown"
@@ -147,9 +145,7 @@ brew "tmate"
 brew "grep"
 brew "rename"
 brew "jq"
-brew "forgo"
-brew "heroku"
-brew "imagemagick"
+brew "forego"
 
 # languages
 brew "nodenv"
@@ -157,9 +153,6 @@ brew "node-build"
 
 brew "rbenv"
 brew "ruby-build"
-
-brew "java"
-brew "maven"
 
 EOF
 
