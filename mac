@@ -4,10 +4,6 @@
 # Be prepared to turn your laptop (or desktop, no haters here)
 # into an awesome development machine.
 
-
-
-exit 0;
-
 fancy_echo() {
   printf "\n$1\n";
 }
