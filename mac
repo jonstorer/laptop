@@ -53,7 +53,8 @@ if ! command -v brew > /dev/null 2>&1; then
     append_to_zshrc '# recommended by brew doctor'
 
     # shellcheck disable=SC2016
-    append_to_zshrc "'export PATH=\"$HOMEBREW_PREFIX/bin:$PATH\"'" 1
+
+    append_to_zshrc "'export PATH=\"$HOMEBREW_PREFIX/bin:\$PATH\"'" 1
 
     export PATH="$HOMEBREW_PREFIX/bin:$PATH"
 fi
