@@ -4,29 +4,23 @@
 # Be prepared to turn your laptop (or desktop, no haters here)
 # into an awesome development machine.
 
-fancy_echo() {
-  local fmt="$1"; shift
 
-  # shellcheck disable=SC2059
-  printf "\n$fmt\n" "$@"
+
+exit 0;
+
+fancy_echo() {
+  printf "\n$1\n";
 }
 
 append_to_zshrc() {
-  local text="$1" zshrc
+  local text="$1"
   local skip_new_line="${2:-0}"
 
-  if [ -w "$HOME/.zshrc.local" ]; then
-    zshrc="$HOME/.zshrc.local"
-  else
-    zshrc="$HOME/.zshrc"
-  fi
+  zshrc="$HOME/.zshrc"
 
   if ! grep -Fqs "$text" "$zshrc"; then
-    if [ "$skip_new_line" -eq 1 ]; then
-      printf "%s\n" "$text" >> "$zshrc"
-    else
-      printf "\n%s\n" "$text" >> "$zshrc"
-    fi
+    [ "$skip_new_line" -ne 1 ] && printf "\n" >> "$zshrc";
+    printf "%s\n" "$text" >> "$zshrc"
   fi
 }
 
@@ -35,22 +29,17 @@ trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 
 set -e
 
-if [ ! -d "$HOME/.bin/" ]; then
-  mkdir "$HOME/.bin"
+[ ! -f "$HOME/.zshrc" ] && touch "$HOME/.zshrc";
+
+if [[ "$(uname -m)" == "x86_64" ]]; then
+  HOMEBREW_PREFIX="/usr/local"
+else
+  HOMEBREW_PREFIX="/opt/homebrew"
 fi
-
-if [ ! -f "$HOME/.zshrc" ]; then
-  touch "$HOME/.zshrc"
-fi
-
-# shellcheck disable=SC2016
-append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
-
-HOMEBREW_PREFIX="/usr/local"
 
 if [ -d "$HOMEBREW_PREFIX" ]; then
   if ! [ -r "$HOMEBREW_PREFIX" ]; then
-    sudo chown -R "$LOGNAME:admin" /usr/local
+    sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
   fi
 else
   sudo mkdir "$HOMEBREW_PREFIX"
@@ -58,8 +47,7 @@ else
   sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
 fi
 
-update_shell() {
-  local shell_path;
+if [[ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]]; then
   shell_path="$(command -v zsh)"
 
   fancy_echo "Changing your shell to zsh ..."
@@ -68,20 +56,11 @@ update_shell() {
     sudo sh -c "echo $shell_path >> /etc/shells"
   fi
   sudo chsh -s "$shell_path" "$USER"
-}
+fi
 
-case "$SHELL" in
-  */zsh)
-    if [ "$(command -v zsh)" != '/usr/local/bin/zsh' ] ; then
-      update_shell
-    fi
-    ;;
-  *)
-    update_shell
-    ;;
-esac
+exit 0;
 
-if ! command -v brew >/dev/null; then
+if ! command -v brew > /dev/null 2>&1; then
   fancy_echo "Installing Homebrew ..."
     curl -fsS \
       'https://raw.githubusercontent.com/Homebrew/install/master/install' | ruby
@@ -89,9 +68,9 @@ if ! command -v brew >/dev/null; then
     append_to_zshrc '# recommended by brew doctor'
 
     # shellcheck disable=SC2016
-    append_to_zshrc 'export PATH="/usr/local/bin:$PATH"' 1
+    append_to_zshrc "'export PATH=\"$HOMEBREW_PREFIX/bin:$PATH\"'" 1
 
-    export PATH="/usr/local/bin:$PATH"
+    export PATH="$HOMEBREW_PREFIX/bin:$PATH"
 fi
 
 if brew list | grep -Fq brew-cask; then
@@ -100,33 +79,43 @@ if brew list | grep -Fq brew-cask; then
 fi
 
 fancy_echo "Updating Homebrew formulae ..."
+brew doctor
 brew update -v
+
 brew tap Homebrew/bundle
 brew bundle --file=- <<EOF
 tap "homebrew/services"
 
 # Microsoft Casks
-cask "dotnet"
+cask "dotnet-sdk"
 cask "visual-studio"
 cask "visual-studio-code"
 cask "microsoft-teams"
+cask "microsoft-remote-desktop"
 cask "powershell"
 
 # Mac Casks
 cask "alfred"
-cask "firefox"
-cask "google-chrome"
-cask "skitch"
-cask "slack"
-cask "iterm2"
-cask "macdown"
-cask "textmate"
-cask "rectangle"
 cask "docker"
 cask "vagrant"
+cask "google-chrome"
+cask "iterm2"
+cask "licecap"
 cask "postman"
+cask "rectangle"
+cask "slack"
 cask "spotify"
-cask "karabiner"
+cask "macdown"
+cask "textmate"
+
+cask "karabiner-elements"
+cask "ngrok"
+cask "quicklook-json"
+cask "qlcolorcode"
+cask "qlmarkdown"
+cask "qlstephen"
+cask "quicklook-csv"
+cask "quicklook-json"
 
 # Libraries & Tools
 brew "ctags"
@@ -147,19 +136,15 @@ brew "tmate"
 brew "grep"
 brew "rename"
 brew "jq"
-brew "forgo"
-brew "heroku"
-brew "imagemagick"
+brew "forego"
 
 # languages
+
+brew "mono"
 brew "nodenv"
 brew "node-build"
-
 brew "rbenv"
 brew "ruby-build"
-
-brew "java"
-brew "maven"
 
 EOF
 
