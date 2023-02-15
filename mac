@@ -43,19 +43,6 @@ else
   sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
 fi
 
-if [[ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]]; then
-  shell_path="$(command -v zsh)"
-
-  fancy_echo "Changing your shell to zsh ..."
-  if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-    fancy_echo "Adding '$shell_path' to /etc/shells"
-    sudo sh -c "echo $shell_path >> /etc/shells"
-  fi
-  sudo chsh -s "$shell_path" "$USER"
-fi
-
-exit 0;
-
 if ! command -v brew > /dev/null 2>&1; then
   fancy_echo "Installing Homebrew ..."
     curl -fsS \
@@ -100,8 +87,7 @@ cask "licecap"
 cask "postman"
 cask "rectangle"
 cask "slack"
-cask "spotify"
-cask "macdown"
+cask "spotify" cask "macdown"
 cask "textmate"
 
 cask "karabiner-elements"
@@ -152,3 +138,14 @@ eval "$(rbenv init -)"
 fancy_echo "Adding nodenv init to zsh profile"
 append_to_zshrc 'eval "$(nodenv init -)"' 1
 eval "$(nodenv init -)"
+
+if [[ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]]; then
+  shell_path="$(command -v zsh)"
+
+  fancy_echo "Changing your shell to zsh ..."
+  if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+    fancy_echo "Adding '$shell_path' to /etc/shells"
+    sudo sh -c "echo $shell_path >> /etc/shells"
+  fi
+  sudo chsh -s "$shell_path" "$USER"
+fi
