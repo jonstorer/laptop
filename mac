@@ -45,7 +45,7 @@ fi
 
 if ! command -v brew > /dev/null 2>&1; then
   fancy_echo "Installing Homebrew ..."
-    /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install')"
+    /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
 
     append_to_zshrc '# recommended by brew doctor'
 
