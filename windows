@@ -1,14 +1,31 @@
 Write-Host "Running laptop script..."
 
+Set-ExecutionPolicy -ExecutionPolicy Bypass
+
+IF(-Not (Test-Path -Path $profile -PathType Leaf)){
+  Write-Host "Creating Profile at '$profile'";
+
+  New-Item -Path (Split-Path -Path $profile) -Name (Split-Path -Leaf $profile) -ItemType File -Force;
+}
 
 If(-Not (Get-Command choco -errorAction SilentlyContinue)){
   Write-Host "Installing Chocolatey ..."
-  Invoke-RestMethod -Uri https://community.chocolatey.org/install.ps1 | Invoke-Expression
-}
 
-choco upgrade chocolatey
+  Set-ExecutionPolicy Bypass -Scope Process -Force;
+  [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072;
+  iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+} else {
+  Write-Host "Updating Chocolatey ..."
+
+  choco upgrade chocolatey
+}
 
 # Command line utils
 
 Write-Host "Installing Command Line Utilities ..."
-choco install openssl git
+
+choco upgrade --yes openssl git vim
+choco upgrade --yes notepadplusplus.install
+choco upgrade --yes visualstudio2022community
+
+Write-Host "Done."

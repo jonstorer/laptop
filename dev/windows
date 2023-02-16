@@ -1,22 +1,28 @@
-Write-Host "Running laptop script..."
 
 
-If(-Not (Get-Command choco -errorAction SilentlyContinue)){
-  Write-Host "Installing Chocolatey ..."
-  Invoke-RestMethod -Uri https://community.chocolatey.org/install.ps1 | Invoke-Expression
-}
+# choco feature enable -n allowGlobalConfirmation 
+# 
+# choco install googlechrome
+# 
+# choco install vscode
+# choco install git
+# choco install powershell-core
+# choco install az.powershell
+# choco install service-fabric-sdk
+# choco install sql-server-management-studio
+# 
+# choco install adobereader
+# choco install notepadplusplus
+# choco install winrar
+# choco install keepassxc
+# 
+# choco install skype
+# choco install microsoft-teams
+# choco install slack
 
-choco upgrade chocolatey
 
-# Command line utils
-
-Write-Host "Installing Command Line Utilities ..."
-choco install openssl git
 
 # everything below here is just notes for later
-
-
-
 
 #  DotNet4.5.2 tsqllint dotnet4.7.2 netfx-4.7.2-devpack
 
