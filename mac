@@ -41,6 +41,8 @@ else
 
   git config --global core.compression 0
   git config --global http.postBuffer 1048576000
+
+  sudo softwareupdate --install-rosetta
 fi
 
 if [ -d "$HOMEBREW_PREFIX" ]; then
