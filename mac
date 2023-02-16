@@ -4,6 +4,13 @@
 # Be prepared to turn your laptop (or desktop, no haters here)
 # into an awesome development machine.
 
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
+
+# Keep using sudo so the permissions don't time out
+# update existing sudo time stamp if set, otherwise do nothing.
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
+
 fancy_echo() {
   printf "\n$1\n";
 }
@@ -31,6 +38,19 @@ if [[ "$(uname -m)" == "x86_64" ]]; then
   HOMEBREW_PREFIX="/usr/local"
 else
   HOMEBREW_PREFIX="/opt/homebrew"
+
+  git config --global core.compression 0
+  git config --global http.postBuffer 1048576000
+
+  # Check if Rosetta is installed
+  checkRosettaStatus=$(/bin/launchctl list | /usr/bin/grep "com.apple.oahd-root-helper")
+  if [[ -e "/Library/Apple/usr/share/rosetta" && "${checkRosettaStatus}" != "" ]]; then
+    echo "Rosetta Folder exists and Rosetta Service is running."
+    exit 0
+  else
+    echo "Rosetta Folder does not exist or Rosetta service is not running. Installing Rosetta..."
+    sudo softwareupdate --install-rosetta --agree-to-license
+  fi
 fi
 
 if [ -d "$HOMEBREW_PREFIX" ]; then
@@ -43,30 +63,12 @@ else
   sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
 fi
 
-if [[ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]]; then
-  shell_path="$(command -v zsh)"
-
-  fancy_echo "Changing your shell to zsh ..."
-  if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-    fancy_echo "Adding '$shell_path' to /etc/shells"
-    sudo sh -c "echo $shell_path >> /etc/shells"
-  fi
-  sudo chsh -s "$shell_path" "$USER"
-fi
-
-exit 0;
-
 if ! command -v brew > /dev/null 2>&1; then
   fancy_echo "Installing Homebrew ..."
-    curl -fsS \
-      'https://raw.githubusercontent.com/Homebrew/install/master/install' | ruby
+   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
 
-    append_to_zshrc '# recommended by brew doctor'
-
-    # shellcheck disable=SC2016
-    append_to_zshrc "'export PATH=\"$HOMEBREW_PREFIX/bin:$PATH\"'" 1
-
-    export PATH="$HOMEBREW_PREFIX/bin:$PATH"
+  append_to_zshrc "eval \"\$($HOMEBREW_PREFIX/bin/brew shellenv)\""
+  eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
 
 if brew list | grep -Fq brew-cask; then
@@ -75,12 +77,11 @@ if brew list | grep -Fq brew-cask; then
 fi
 
 fancy_echo "Updating Homebrew formulae ..."
-brew doctor
-brew update -v
+brew update --force
 
-brew tap Homebrew/bundle
 brew bundle --file=- <<EOF
 tap "homebrew/services"
+tap "homebrew/cask-versions"
 
 # Microsoft Casks
 cask "dotnet-sdk"
@@ -103,6 +104,7 @@ cask "slack"
 cask "spotify"
 cask "macdown"
 cask "textmate"
+cask "utm"
 
 cask "karabiner-elements"
 cask "ngrok"
@@ -136,7 +138,6 @@ brew "forego"
 
 # languages
 
-brew "mono"
 brew "nodenv"
 brew "node-build"
 brew "rbenv"
@@ -152,3 +153,14 @@ eval "$(rbenv init -)"
 fancy_echo "Adding nodenv init to zsh profile"
 append_to_zshrc 'eval "$(nodenv init -)"' 1
 eval "$(nodenv init -)"
+
+if [[ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]]; then
+  shell_path="$(command -v zsh)"
+
+  fancy_echo "Changing your shell to zsh ..."
+  if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+    fancy_echo "Adding '$shell_path' to /etc/shells"
+    sudo sh -c "echo $shell_path >> /etc/shells"
+  fi
+  sudo chsh -s "$shell_path" "$USER"
+fi
