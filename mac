@@ -96,6 +96,7 @@ cask "slack"
 cask "spotify"
 cask "macdown"
 cask "textmate"
+cask "utm"
 
 cask "karabiner-elements"
 cask "ngrok"
@@ -129,7 +130,6 @@ brew "forego"
 
 # languages
 
-brew "mono"
 brew "nodenv"
 brew "node-build"
 brew "rbenv"
