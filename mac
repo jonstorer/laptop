@@ -46,17 +46,13 @@ else
   sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
 fi
 
+
 if ! command -v brew > /dev/null 2>&1; then
   fancy_echo "Installing Homebrew ..."
-    /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+  /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
 
-    append_to_zshrc '# recommended by brew doctor'
-
-    # shellcheck disable=SC2016
-
-    append_to_zshrc "'export PATH=\"$HOMEBREW_PREFIX/bin:\$PATH\"'" 1
-
-    export PATH="$HOMEBREW_PREFIX/bin:$PATH"
+  append_to_zshrc "eval \"\$($HOMEBREW_PREFIX/bin/brew shellenv)\""
+  eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
 
 if brew list | grep -Fq brew-cask; then
