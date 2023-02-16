@@ -42,7 +42,16 @@ else
   git config --global core.compression 0
   git config --global http.postBuffer 1048576000
 
-  sudo softwareupdate --install-rosetta
+  # Check if Rosetta is installed
+  checkRosettaStatus=$(/bin/launchctl list | /usr/bin/grep "com.apple.oahd-root-helper")
+  RosettaFolder="/Library/Apple/usr/share/rosetta"
+  if [[ -e "${RosettaFolder}" && "${checkRosettaStatus}" != "" ]]; then
+    echo "Rosetta Folder exists and Rosetta Service is running."
+    exit 0
+  else
+    echo "Rosetta Folder does not exist or Rosetta service is not running. Installing Rosetta..."
+    sudo softwareupdate --install-rosetta --agree-to-license
+  fi
 fi
 
 if [ -d "$HOMEBREW_PREFIX" ]; then
