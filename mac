@@ -4,6 +4,13 @@
 # Be prepared to turn your laptop (or desktop, no haters here)
 # into an awesome development machine.
 
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
+
+# Keep using sudo so the permissions don't time out
+# update existing sudo time stamp if set, otherwise do nothing.
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
+
 fancy_echo() {
   printf "\n$1\n";
 }
@@ -49,11 +56,13 @@ fi
 
 if ! command -v brew > /dev/null 2>&1; then
   fancy_echo "Installing Homebrew ..."
-  /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
 
   append_to_zshrc "eval \"\$($HOMEBREW_PREFIX/bin/brew shellenv)\""
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
+
+exit 0;
 
 if brew list | grep -Fq brew-cask; then
   fancy_echo "Uninstalling old Homebrew-Cask ..."
