@@ -67,11 +67,9 @@ if brew list | grep -Fq brew-cask; then
 fi
 
 fancy_echo "Updating Homebrew formulae ..."
-brew doctor
+brew update --force
 
 exit 0;
-
-brew update --force
 
 #brew tap Homebrew/bundle
 brew bundle --file=- <<EOF
