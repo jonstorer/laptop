@@ -44,8 +44,7 @@ else
 
   # Check if Rosetta is installed
   checkRosettaStatus=$(/bin/launchctl list | /usr/bin/grep "com.apple.oahd-root-helper")
-  RosettaFolder="/Library/Apple/usr/share/rosetta"
-  if [[ -e "${RosettaFolder}" && "${checkRosettaStatus}" != "" ]]; then
+  if [[ -e "/Library/Apple/usr/share/rosetta" && "${checkRosettaStatus}" != "" ]]; then
     echo "Rosetta Folder exists and Rosetta Service is running."
     exit 0
   else
