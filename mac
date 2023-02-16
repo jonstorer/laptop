@@ -53,7 +53,6 @@ else
   sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
 fi
 
-
 if ! command -v brew > /dev/null 2>&1; then
   fancy_echo "Installing Homebrew ..."
    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
@@ -62,18 +61,18 @@ if ! command -v brew > /dev/null 2>&1; then
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
 
-exit 0;
-
 if brew list | grep -Fq brew-cask; then
   fancy_echo "Uninstalling old Homebrew-Cask ..."
   brew uninstall --force brew-cask
 fi
 
+exit 0;
+
 fancy_echo "Updating Homebrew formulae ..."
 brew doctor
-brew update -v
+brew update --force
 
-brew tap Homebrew/bundle
+#brew tap Homebrew/bundle
 brew bundle --file=- <<EOF
 tap "homebrew/services"
 
