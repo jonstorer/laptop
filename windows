@@ -24,8 +24,6 @@ If(-Not (Get-Command choco -errorAction SilentlyContinue)){
 
 Write-Host "Installing Command Line Utilities ..."
 
-choco upgrade --yes openssl git vim
-choco upgrade --yes notepadplusplus.install
-choco upgrade --yes visualstudio2022community
+choco upgrade --yes openssl git vim notepadplusplus.install visualstudio2022community
 
 Write-Host "Done."
