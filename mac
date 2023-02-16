@@ -71,9 +71,9 @@ fi
 fancy_echo "Updating Homebrew formulae ..."
 brew update --force
 
-#brew tap Homebrew/bundle
 brew bundle --file=- <<EOF
 tap "homebrew/services"
+tap "homebrew/cask-versions"
 
 # Microsoft Casks
 cask "dotnet-sdk"
