@@ -66,10 +66,11 @@ if brew list | grep -Fq brew-cask; then
   brew uninstall --force brew-cask
 fi
 
-exit 0;
-
 fancy_echo "Updating Homebrew formulae ..."
 brew doctor
+
+exit 0;
+
 brew update --force
 
 #brew tap Homebrew/bundle
