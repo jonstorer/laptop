@@ -17,6 +17,10 @@ trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 # fail fast
 set -e
 
+sudo xcodebuild -license accept
+
+xcode-select --install 2>&1 | grep -1 installed
+
 dotFilesPath="$HOME/.dotfiles";
 
 if [ ! -d $dotFilesPath ]; then
