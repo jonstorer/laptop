@@ -1,0 +1,27 @@
+tap "homebrew/cask-versions"
+
+cask "dotnet-sdk"
+
+cask "visual-studio"
+cask "visual-studio-code"
+
+cask "microsoft-teams"
+cask "microsoft-remote-desktop"
+
+# Mac Casks
+cask "alfred"
+cask "docker"
+cask "vagrant"
+cask "google-chrome"
+cask "iterm2"
+cask "licecap"
+cask "postman"
+cask "rectangle"
+cask "slack"
+cask "spotify"
+cask "macdown"
+cask "textmate"
+cask "utm"
+
+cask "karabiner-elements"
+cask "ngrok"
