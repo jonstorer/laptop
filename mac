@@ -69,10 +69,10 @@ FORMULAE=(
   ruby-build
 )
 
-echo "brew install" "${FORMULAE[@]}"
+echo "✔ brew install" "${FORMULAE[@]}"
 brew install "${FORMULAE[@]}"
 
-echo "brew tap cask-version"
+echo "✔ brew tap cask-version"
 brew tap "homebrew/cask-versions"
 
 CASKS=(
@@ -98,13 +98,13 @@ CASKS=(
   ngrok
 )
 
-echo "brew install --cask" "${CASKS[@]}"
+echo "✔ brew install --cask" "${CASKS[@]}"
 brew install --cask "${CASKS[@]}"
 
-echo "brew cleanup"
+echo "✔ brew cleanup"
 brew cleanup
 
-echo "Cutting it short for test";
+echo "✔ Cutting it short for test";
 exit 0;
 
 zshShellPath="$(brew --prefix)/bin/zsh"
