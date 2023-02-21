@@ -107,36 +107,27 @@ brew cleanup
 echo "Cutting it short for test";
 exit 0;
 
-zshShellPath="$HOMEBREW_PREFIX/bin/zsh"
+zshShellPath="$(brew --prefix)/bin/zsh"
 
-[ ! -f $zshShellPath ] && echo "zsh is not installed" && exit 1;
+echo "✔ Ensure '$zshShellPath' exists in /etc/shells"
+[ ! -z $(grep "$zshShellPath" /etc/shells) ] && sudo sh -c "echo $zshShellPath >> /etc/shells";
 
-if [[ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]]; then
-  if ! grep "$zshShellPath" /etc/shells > /dev/null 2>&1 ; then
-    echo "Adding '$zshShellPath' to /etc/shells"
-    sudo sh -c "echo $zshShellPath >> /etc/shells"
-  fi
-
-  echo "Changing your shell to zsh ..."
-  sudo chsh -s "$zshShellPath" "$USER"
-fi
+echo "✔ Ensure shell is '$zshShellPath'";
+[ "$(command -v zsh)" != $zshShellPath ] && sudo chsh -s "$zshShellPath" "$USER";
 
 # Install oh-my-zsh
 
-echo "Installing oh-my-zsh"
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-echo "Need to logout now to start the new SHELL"
-logout
+echo "✔ Install oh-my-zsh"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)";
 
 dotFilesPath="$HOME/.dotfiles";
 
-if [ ! -d $dotFilesPath ]; then
-  git clone git@github.com:jonstorer/dotfiles.git $dotFilesPath;
-fi
+echo "✔ Fetch dotfiles to '$dotFilesPath'";
+[ ! -d $dotFilesPath ] && git clone git@github.com:jonstorer/dotfiles.git $dotFilesPath;
 
-cd $dotFilesPath && git pull && git checkout js-dotfiles-only && sh install.sh && cd -
+cd $dotFilesPath && git pull && git checkout js-dotfiles-only && sh install.sh && cd -;
 
-echo "Configuring Mac & Applications"
+echo "✔ Change preferences"
 
 osascript -e 'tell application "System Preferences" to quit'
 
