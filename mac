@@ -36,9 +36,6 @@ else
   [ ! -e "/Library/Apple/usr/share/rosetta" ] && sudo softwareupdate --install-rosetta --agree-to-license
 fi
 
-echo "Cutting it short for test";
-exit 0;
-
 fancy_echo "Ensure Homebrew Directories exist with permissions"
 sudo mkdir -p "$HOMEBREW_PREFIX"
 sudo chflags norestricted "$HOMEBREW_PREFIX"
@@ -50,6 +47,9 @@ if ! command -v brew > /dev/null 2>&1; then
 
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
+
+echo "Cutting it short for test";
+exit 0;
 
 fancy_echo "brew update ..."
 brew update --force
