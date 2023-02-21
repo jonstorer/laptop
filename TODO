@@ -1,0 +1,5 @@
+- mac script
+-- make laptop work with dotfiles
+-- move preferences from dotfiles to laptop
+-- remove non dotfiles from dotfiles
+-- check if casks are installed before installing

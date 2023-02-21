@@ -1,0 +1,34 @@
+fancy_echo() {
+  local fmt="$1"; shift
+  # shellcheck disable=SC2059
+  echo $fmt
+  [[ ! -z "$@" ]] && echo "$@"
+}
+
+FORMULAE=(
+  ctags
+  gnupg2
+  openssl
+  reattach-to-user-namespace
+  gcc
+  gnu-sed
+  git
+  hub
+  htop
+  watch
+  the_silver_searcher
+  tmux
+  vim
+  zsh
+  tmate
+  grep
+  rename
+  jq
+  forego
+  nodenv
+  node-build
+  rbenv
+  ruby-build
+)
+
+fancy_echo "brew install ..." "${FORMULAE[@]}"
