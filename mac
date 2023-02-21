@@ -17,13 +17,6 @@ while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 # fail fast
 set -e
 
-fancy_echo() {
-  local fmt="$1"; shift
-  # shellcheck disable=SC2059
-  echo $fmt
-  [[ ! -z "$@" ]] && echo "$@"
-}
-
 if [[ "$(uname -m)" == "x86_64" ]]; then
   HOMEBREW_PREFIX="/usr/local"
 else
@@ -33,16 +26,15 @@ else
   #git config --global http.postBuffer 1048576000
 
   # Check if Rosetta is installed
-  [ ! -e "/Library/Apple/usr/share/rosetta" ] && sudo softwareupdate --install-rosetta --agree-to-license
+  if [ ! -e "/Library/Apple/usr/share/rosetta" ]; then
+    echo "✔ Install Rosetta"
+    sudo softwareupdate --install-rosetta --agree-to-license
+  fi
 fi
 
-fancy_echo "✔ Prep $HOMEBREW_PREFIX"
-sudo mkdir -p "$HOMEBREW_PREFIX"
-sudo chflags norestricted "$HOMEBREW_PREFIX"
-sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
-
 if [ -z "$(command -v brew)" ] ; then
-  fancy_echo "✔ Install Homebrew"
+  echo "✔ Install Homebrew"
+  echo "  • Installing Command Line Tools for XCode may take a while"
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
 
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
@@ -51,8 +43,8 @@ fi
 echo "Cutting it short for test";
 exit 0;
 
-fancy_echo "brew update ..."
-brew update --force
+echo "✔ Update brew"
+brew update #--force
 
 FORMULAE=(
   ctags
@@ -80,10 +72,10 @@ FORMULAE=(
   ruby-build
 )
 
-fancy_echo "brew install" "${FORMULAE[@]}"
+echo "brew install" "${FORMULAE[@]}"
 brew install "${FORMULAE[@]}"
 
-fancy_echo "brew tap cask-version"
+echo "brew tap cask-version"
 brew tap "homebrew/cask-versions"
 
 CASKS=(
@@ -109,31 +101,31 @@ CASKS=(
   ngrok
 )
 
-fancy_echo "brew install --cask" "${CASKS[@]}"
+echo "brew install --cask" "${CASKS[@]}"
 brew install --cask "${CASKS[@]}"
 
-fancy_echo "brew cleanup"
+echo "brew cleanup"
 brew cleanup
 
 zshShellPath="$HOMEBREW_PREFIX/bin/zsh"
 
-[ ! -f $zshShellPath ] && fancy_echo "zsh is not installed" && exit 1;
+[ ! -f $zshShellPath ] && echo "zsh is not installed" && exit 1;
 
 if [[ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]]; then
   if ! grep "$zshShellPath" /etc/shells > /dev/null 2>&1 ; then
-    fancy_echo "Adding '$zshShellPath' to /etc/shells"
+    echo "Adding '$zshShellPath' to /etc/shells"
     sudo sh -c "echo $zshShellPath >> /etc/shells"
   fi
 
-  fancy_echo "Changing your shell to zsh ..."
+  echo "Changing your shell to zsh ..."
   sudo chsh -s "$zshShellPath" "$USER"
 fi
 
 # Install oh-my-zsh
 
-fancy_echo "Installing oh-my-zsh"
+echo "Installing oh-my-zsh"
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-fancy_echo "Need to logout now to start the new SHELL"
+echo "Need to logout now to start the new SHELL"
 logout
 
 dotFilesPath="$HOME/.dotfiles";
@@ -144,7 +136,7 @@ fi
 
 cd $dotFilesPath && git pull && git checkout js-dotfiles-only && sh install.sh && cd -
 
-fancy_echo "Configuring Mac & Applications"
+echo "Configuring Mac & Applications"
 
 osascript -e 'tell application "System Preferences" to quit'
 
