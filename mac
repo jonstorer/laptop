@@ -12,7 +12,7 @@ while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
 # Catch, print, exit
 # shellcheck disable=SC2154
-trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n$ret" >&2; exit $ret' EXIT
+#trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n$ret" >&2; exit $ret' EXIT
 
 # fail fast
 set -e
