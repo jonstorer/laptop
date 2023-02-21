@@ -99,7 +99,7 @@ CASKS=()
 [ ! -e "$(brew --prefix)/bin/ngrok" ]                 && CASKS+=(ngrok)
 
 echo "✔ brew install --cask" "${CASKS[@]}"
-[ ${#CASKS[@]} -eq 0 ] && brew install --cask "${CASKS[@]}"
+[ ${#CASKS[@]} -ne 0 ] && brew install --cask "${CASKS[@]}"
 
 echo "✔ brerrorsew cleanup"
 brew cleanup
