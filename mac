@@ -41,7 +41,7 @@ sudo mkdir -p "$HOMEBREW_PREFIX"
 sudo chflags norestricted "$HOMEBREW_PREFIX"
 sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
 
-if ! command -v brew > /dev/null 2>&1; then
+if [ -z "$(command -v brew)" ] ; then
   fancy_echo "Installing Homebrew"
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
 
@@ -132,7 +132,7 @@ fi
 # Install oh-my-zsh
 
 fancy_echo "Installing oh-my-zsh"
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 fancy_echo "Need to logout now to start the new SHELL"
 logout
 
