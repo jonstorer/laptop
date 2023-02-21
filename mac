@@ -36,7 +36,7 @@ else
   [ ! -e "/Library/Apple/usr/share/rosetta" ] && sudo softwareupdate --install-rosetta --agree-to-license
 fi
 
-fancy_echo "Ensure Homebrew Directories exist with permissions"
+fancy_echo "✔ Prep $HOMEBREW_PREFIX"
 sudo mkdir -p "$HOMEBREW_PREFIX"
 sudo chflags norestricted "$HOMEBREW_PREFIX"
 sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
