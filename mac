@@ -40,9 +40,6 @@ if [ -z "$(command -v brew)" ] ; then
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
 
-echo "Cutting it short for test";
-exit 0;
-
 echo "✔ Update brew"
 brew update #--force
 
@@ -106,6 +103,9 @@ brew install --cask "${CASKS[@]}"
 
 echo "brew cleanup"
 brew cleanup
+
+echo "Cutting it short for test";
+exit 0;
 
 zshShellPath="$HOMEBREW_PREFIX/bin/zsh"
 
