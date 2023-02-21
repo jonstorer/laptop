@@ -32,14 +32,14 @@ else
   #git config --global core.compression 0
   #git config --global http.postBuffer 1048576000
 
-  ## Check if Rosetta is installed
-  #checkRosettaStatus=$(/bin/launchctl list | grep "com.apple.oahd-root-helper")
-  #if [[ -e "/Library/Apple/usr/share/rosetta" && "${checkRosettaStatus}" != "" ]]; then
-    #fancy_echo "Rosetta Folder exists and Rosetta Service is running."
-  #else
-    #fancy_echo "Rosetta Folder does not exist or Rosetta service is not running." "Installing Rosetta ..."
-    #sudo softwareupdate --install-rosetta --agree-to-license
-  #fi
+  # Check if Rosetta is installed
+  checkRosettaStatus=$(/bin/launchctl list | grep "com.apple.oahd-root-helper")
+  if [[ -e "/Library/Apple/usr/share/rosetta" && "${checkRosettaStatus}" != "" ]]; then
+    fancy_echo "Rosetta Folder exists and Rosetta Service is running."
+  else
+    fancy_echo "Rosetta Folder does not exist or Rosetta service is not running." "Installing Rosetta ..."
+    sudo softwareupdate --install-rosetta --agree-to-license
+  fi
 fi
 
 #fancy_echo "Ensure Homebrew Directories exist with permissions"
