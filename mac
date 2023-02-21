@@ -75,33 +75,33 @@ brew install "${FORMULAE[@]}"
 echo "✔ brew tap cask-version"
 brew tap "homebrew/cask-versions"
 
-CASKS=(
-  dotnet-sdk
-  visual-studio
-  visual-studio-code
-  microsoft-teams
-  microsoft-remote-desktop
-  alfred
-  docker
-  vagrant
-  google-chrome
-  iterm2
-  licecap
-  postman
-  rectangle
-  slack
-  spotify
-  macdown
-  textmate
-  utm
-  karabiner-elements
-  ngrok
-)
+CASKS=()
+
+[ ! -e "$(brew --prefix)/bin/dotnet" ]                && CASKS+=(dotnet-sdk)
+[ ! -e "$(brew --caskroom)/visual-studio" ]           && CASKS+=(visual-studio)
+[ ! -e "/Applications/Visual Studio Code.app" ]       && CASKS+=(visual-studio-code)
+[ ! -e "/Applications/Microsoft Teams.app" ]          && CASKS+=(microsoft-teams)
+[ ! -e "/Applications/Microsoft Remote Desktop.app" ] && CASKS+=(microsoft-remote-desktop)
+[ ! -e "/Applications/Alfred 5.app" ]                 && CASKS+=(alfred)
+[ ! -e "/Applications/Docker.app" ]                   && CASKS+=(docker)
+[ ! -e "/Applications/Google Chrome.app" ]            && CASKS+=(google-chrome)
+[ ! -e "/Applications/iTerm.app" ]                    && CASKS+=(iterm2)
+[ ! -e "/Applications/LICEcap.app" ]                  && CASKS+=(licecap)
+[ ! -e "/opt/vagrant" ]                               && CASKS+=(vagrant)
+[ ! -e "/Applications/Postman.app" ]                  && CASKS+=(postman)
+[ ! -e "/Applications/Rectangle.app" ]                && CASKS+=(rectangle)
+[ ! -e "/Applications/Slack.app" ]                    && CASKS+=(slack)
+[ ! -e "/Applications/Spotify.app" ]                  && CASKS+=(spotify)
+[ ! -e "/Applications/Macdown.app" ]                  && CASKS+=(macdown)
+[ ! -e "/Applications/TextMate.app" ]                 && CASKS+=(textmate)
+[ ! -e "/Applications/UTM.app" ]                      && CASKS+=(utm)
+[ ! -e "/Applications/Karabiner-Elements.app" ]       && CASKS+=(karabiner-elements)
+[ ! -e "$(brew --prefix)/bin/ngrok" ]                 && CASKS+=(ngrok)
 
 echo "✔ brew install --cask" "${CASKS[@]}"
-brew install --cask "${CASKS[@]}"
+[ ${#CASKS[@]} -eq 0 ] && brew install --cask "${CASKS[@]}"
 
-echo "✔ brew cleanup"
+echo "✔ brerrorsew cleanup"
 brew cleanup
 
 zshShellPath="$(brew --prefix)/bin/zsh"

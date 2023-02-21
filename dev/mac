@@ -1,6 +1,8 @@
 
 #echo "✔ Touch ~/.zprofile"
 
+brew info visual-studio-code | grep "(App)" | sed 's/\ \(App\)//'
+
 HOMEBREW_CASK_APPDIR="$(brew config | grep HOMEBREW_CASK_OPTS | sed 's/.*=//' | sed 's/"]//''"')";
 
 #brew info --cask slack | grep "(App)" | sed 's/\ .*//'
