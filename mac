@@ -42,7 +42,7 @@ sudo chflags norestricted "$HOMEBREW_PREFIX"
 sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
 
 if [ -z "$(command -v brew)" ] ; then
-  fancy_echo "Installing Homebrew"
+  fancy_echo "✔ Install Homebrew"
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
 
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
