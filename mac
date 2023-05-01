@@ -11,12 +11,12 @@ sudo -v
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
 fancy_echo() {
-  printf "\n$1\n";
+  printf "\n%s\n", "$1";
 }
 
 append_to_zshrc() {
-  local text="$1"
-  local skip_new_line="${2:-0}"
+  text="$1"
+  skip_new_line="${2:-0}"
 
   zshrc="$HOME/.zshrc"
 
@@ -33,12 +33,11 @@ set -e
 
 [ ! -f "$HOME/.zshrc" ] && touch "$HOME/.zshrc";
 
-if [[ "$(uname -m)" == "x86_64" ]]; then
+if [ "$(uname -m)" = "x86_64" ]; then
   HOMEBREW_PREFIX="/usr/local"
 else
   HOMEBREW_PREFIX="/opt/homebrew"
-
-  if [[ $(/usr/sbin/sysctl sysctl.proc_translated | awk -F': ' '{print $2}') == 0 ]]; then
+  if [ "$(sysctl -n sysctl.proc_translated | awk -F': ' '{print $2}')" = "0" ]; then
     echo "Rosetta Folder does not exist or Rosetta service is not running. Installing Rosetta..."
     sudo softwareupdate --install-rosetta --agree-to-license
   fi
@@ -133,6 +132,7 @@ brew "jpeg"
 brew "giflib"
 brew "librsvg"
 brew "pixman"
+brew "shellcheck"
 
 # languages
 
@@ -146,14 +146,14 @@ EOF
 
 # shellcheck disable=SC2016
 fancy_echo "Adding rbenv init to zsh profile"
-append_to_zshrc 'eval "$(rbenv init - --no-rehash)"' 1
+append_to_zshrc "eval \"$(rbenv init - --no-rehash)\"" 1
 eval "$(rbenv init -)"
 
 fancy_echo "Adding nodenv init to zsh profile"
-append_to_zshrc 'eval "$(nodenv init -)"' 1
+append_to_zshrc "eval \"$(nodenv init -)\"" 1
 eval "$(nodenv init -)"
 
-if [[ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]]; then
+if [ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]; then
   shell_path="$(command -v zsh)"
 
   fancy_echo "Changing your shell to zsh ..."
