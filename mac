@@ -4,9 +4,8 @@
 # Be prepared to turn your laptop (or desktop, no haters here)
 # into an awesome development machine.
 
-# Ask for sudo upfront so we don't have to get it later
+#n Ask for sudo upfront so we don't have to get it later
 sudo -v
-
 # Keep using sudo so the permissions don't time out
 # update existing sudo time stamp if set, otherwise do nothing.
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
@@ -28,7 +27,7 @@ append_to_zshrc() {
 }
 
 # shellcheck disable=SC2154
-trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+trap 'ret=$?; test $ret -ne 0 && printf "$ret\n\nfailed\n\n" >&2; exit $ret' EXIT
 
 set -e
 
@@ -39,15 +38,7 @@ if [[ "$(uname -m)" == "x86_64" ]]; then
 else
   HOMEBREW_PREFIX="/opt/homebrew"
 
-  git config --global core.compression 0
-  git config --global http.postBuffer 1048576000
-
-  # Check if Rosetta is installed
-  checkRosettaStatus=$(/bin/launchctl list | /usr/bin/grep "com.apple.oahd-root-helper")
-  if [[ -e "/Library/Apple/usr/share/rosetta" && "${checkRosettaStatus}" != "" ]]; then
-    echo "Rosetta Folder exists and Rosetta Service is running."
-    exit 0
-  else
+  if [[ $(/usr/sbin/sysctl sysctl.proc_translated | awk -F': ' '{print $2}') == 0 ]]; then
     echo "Rosetta Folder does not exist or Rosetta service is not running. Installing Rosetta..."
     sudo softwareupdate --install-rosetta --agree-to-license
   fi
@@ -82,6 +73,7 @@ brew update --force
 brew bundle --file=- <<EOF
 tap "homebrew/services"
 tap "homebrew/cask-versions"
+tap "nodenv/nodenv"
 
 # Microsoft Casks
 cask "dotnet-sdk"
@@ -105,13 +97,11 @@ cask "spotify"
 cask "macdown"
 cask "textmate"
 cask "utm"
+cask "navicat-for-sqlite"
+cask "pgadmin4"
 
 cask "karabiner-elements"
 cask "ngrok"
-cask "quicklook-json"
-cask "qlcolorcode"
-cask "qlmarkdown"
-cask "qlstephen"
 cask "quicklook-csv"
 cask "quicklook-json"
 
@@ -135,11 +125,20 @@ brew "grep"
 brew "rename"
 brew "jq"
 brew "forego"
+brew "pkg-config"
+brew "cairo"
+brew "pango"
+brew "libpng"
+brew "jpeg"
+brew "giflib"
+brew "librsvg"
+brew "pixman"
 
 # languages
 
 brew "nodenv"
 brew "node-build"
+brew "nodenv-nvmrc"
 brew "rbenv"
 brew "ruby-build"
 
