@@ -2,41 +2,36 @@
 
 # Welcome to the raspberry pi setup script!
 
-fancy_echo() {
-  local msg="$1"; shift
+#n Ask for sudo upfront so we don't have to get it later
+sudo -v # Keep using sudo so the permissions don't time out
+# update existing sudo time stamp if set, otherwise do nothing.
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
-  printf "\n**\n" "$@"
-  printf "** $msg" "$@"
-  printf "\n**\n\n" "$@"
+fancy_echo() {
+  printf "\n%s\n" "$1";
 }
 
 append_to_zshrc() {
-  local text="$1" zshrc
-  local skip_new_line="${2:-0}"
+  text="$1"
+  skip_new_line="${2:-0}"
 
-  if [ -w "$HOME/.zshrc.local" ]; then
-    zshrc="$HOME/.zshrc.local"
-  else
-    zshrc="$HOME/.zshrc"
-  fi
+  zshrc="$HOME/.zshrc"
 
   if ! grep -Fqs "$text" "$zshrc"; then
-    if [ "$skip_new_line" -eq 1 ]; then
-      printf "%s\n" "$text" >> "$zshrc"
-    else
-      printf "\n%s\n" "$text" >> "$zshrc"
-    fi
+    [ "$skip_new_line" -ne 1 ] && printf "\n" >> "$zshrc";
+    printf "%s\n" "$text" >> "$zshrc"
   fi
 }
 
 apt_install() {
-  local package="$1";
+  package="$1";
 
   fancy_echo "Installing $package"
-  sudo apt install -y $package
+  "$package"
 }
 
-trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+# shellcheck disable=SC2154
+trap 'ret=$?; test $ret -ne 0 && printf "$ret\n\nfailed\n\n" >&2; exit $ret' EXIT
 set -e
 
 fancy_echo "Update Apt Cache"
@@ -48,22 +43,23 @@ sudo apt upgrade
 fancy_echo "Upgrade Distro"
 sudo apt dist-upgrade
 
-apt_install build-essential
-apt_install gcc
-apt_install zsh
-apt_install silversearcher-ag
-apt_install git
-apt_install htop
-apt_install hub
-apt_install openssh-server
-apt_install openssl
-apt_install libssl-dev
-apt_install zlib1g-dev
-apt_install tmux
-apt_install vim
-apt_install python3-pip
-apt_install libffi-dev
-apt_install docker.io
+sudo apt install -y \
+  build-essential \
+  gcc \
+  zsh \
+  silversearcher-ag \
+  git \
+  htop \
+  hub \
+  openssh-server \
+  openssl \
+  libssl-dev \
+  zlib1g-dev \
+  tmux \
+  vim \
+  python3-pip \
+  libffi-dev \
+  docker.io
 
 sudo pip3 install docker-compose
 
@@ -77,14 +73,15 @@ sudo iptables-save
 if [ ! -d "$HOME/.bin/" ]; then mkdir "$HOME/.bin"; fi
 if [ ! -f "$HOME/.zshrc" ]; then touch "$HOME/.zshrc"; fi
 
+# shellcheck disable=SC2016
 append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
 
 shell_path="$(command -v zsh)"
-fancy_echo "Changing your shell to zsh at '$shell_path' ..."
+fancy_echo "Changing the shell to zsh at '$shell_path' ..."
 
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   fancy_echo "Adding '$shell_path' to /etc/shells"
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
 
-sudo chsh -s "$shell_path" $USER
+sudo chsh -s "$shell_path" "$USER"

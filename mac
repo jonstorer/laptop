@@ -95,8 +95,10 @@ cask "spotify"
 cask "macdown"
 cask "textmate"
 cask "utm"
+
 cask "navicat-for-sqlite"
 cask "pgadmin4"
+cask "redisinsight"
 
 cask "karabiner-elements"
 cask "ngrok"
@@ -144,7 +146,6 @@ brew "ruby-build"
 
 EOF
 
-# shellcheck disable=SC2016
 fancy_echo "Adding rbenv init to zsh profile"
 append_to_zshrc "eval \"$(rbenv init - --no-rehash)\"" 1
 eval "$(rbenv init -)"
