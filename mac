@@ -95,6 +95,7 @@ cask "spotify"
 cask "macdown"
 cask "textmate"
 cask "utm"
+cask "tunnelblick"
 
 cask "navicat-for-sqlite"
 cask "pgadmin4"
