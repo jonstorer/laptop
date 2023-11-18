@@ -1,65 +1,55 @@
 #!/bin/sh
 
-# nWelcome to the raspberry pi setup script!
+# Welcome to the raspberry pi setup script!
 
 # Ask for sudo upfront so we don't have to get it later
-sudo -v # Keep using sudo so the permissions don't time out
-# update existing sudo time stamp if set, otherwise do nothing.
+sudo -v
+
+# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
-
-fancy_echo() {
-  printf "\n%s\n" "$1";
-}
-
-append_to_zshrc() {
-  text="$1"
-  skip_new_line="${2:-0}"
-
-  zshrc="$HOME/.zshrc"
-
-  if ! grep -Fqs "$text" "$zshrc"; then
-    [ "$skip_new_line" -ne 1 ] && printf "\n" >> "$zshrc";
-    printf "%s\n" "$text" >> "$zshrc"
-  fi
-}
-
-apt_install() {
-  package="$1";
-
-  fancy_echo "Installing $package"
-  sudo apt install -y "$package"
-}
 
 trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
-fancy_echo "Update Apt Cache"
 sudo apt update
+sudo apt full-upgrade
 
-fancy_echo "Upgrade Installed Packages"
-sudo apt upgrade
+sudo apt-get install -y ca-certificates curl gnupg
 
-fancy_echo "Upgrade Distro"
-sudo apt dist-upgrade
+if [ ! -e "/etc/apt/keyrigns/docker.gpg" ]; then
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-apt_install build-essential
-apt_install gcc
-apt_install zsh
-apt_install silversearcher-ag
-apt_install git
-apt_install htop
-apt_install hub
-apt_install openssh-server
-apt_install openssl
-apt_install libssl-dev
-apt_install zlib1g-dev
-apt_install tmux
-apt_install vim
-apt_install python3-pip
-apt_install libffi-dev
-apt_install docker.io
+  echo \
+    "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+fi
 
-sudo pip3 install docker-compose
+sudo apt full-upgrade
+
+sudo apy install -v <<EOF
+build-essential
+gcc
+zsh
+exuberant-ctags
+git
+htop
+hub
+openssh-server
+openssl
+silversearcher-ag
+tmate
+tmux
+vim
+
+docker-ce
+docker-ce-cli
+containerd.io
+docker-buildx-plugin
+docker-compose-plugin
+EOF
 
 sudo systemctl enable ssh
 sudo systemctl start ssh
@@ -68,17 +58,10 @@ sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 sudo iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
 sudo iptables-save
 
-if [ ! -d "$HOME/.bin/" ]; then mkdir "$HOME/.bin"; fi
-if [ ! -f "$HOME/.zshrc" ]; then touch "$HOME/.zshrc"; fi
-
-append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
-
 shell_path="$(command -v zsh)"
-fancy_echo "Changing your shell to zsh at '$shell_path' ..."
-
+echo "Ensure shell is zsh at '$shell_path' ..."
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-  fancy_echo "Adding '$shell_path' to /etc/shells"
+  echo "Add '$shell_path' to /etc/shells"
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
-
-sudo chsh -s "$shell_path" "$USER"
+sudo chsh -s "$shell_path" $USER

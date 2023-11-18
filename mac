@@ -1,36 +1,15 @@
 #!/bin/sh
 
-# Welcome to the laptop script!
-# Be prepared to turn your laptop (or desktop, no haters here)
-# into an awesome development machine.
+# Welcome to the machine script!
 
 # Ask for sudo upfront so we don't have to get it later
-sudo -v # Keep using sudo so the permissions don't time out
-# update existing sudo time stamp if set, otherwise do nothing.
+sudo -v
+
+# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
-fancy_echo() {
-  printf "\n%s\n" "$1";
-}
-
-append_to_zshrc() {
-  text="$1"
-  skip_new_line="${2:-0}"
-
-  zshrc="$HOME/.zshrc"
-
-  if ! grep -Fqs "$text" "$zshrc"; then
-    [ "$skip_new_line" -ne 1 ] && printf "\n" >> "$zshrc";
-    printf "%s\n" "$text" >> "$zshrc"
-  fi
-}
-
-# shellcheck disable=SC2154
-trap 'ret=$?; test $ret -ne 0 && printf "$ret\n\nfailed\n\n" >&2; exit $ret' EXIT
-
+trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
-
-[ ! -f "$HOME/.zshrc" ] && touch "$HOME/.zshrc";
 
 if [ "$(uname -m)" = "x86_64" ]; then
   HOMEBREW_PREFIX="/usr/local"
@@ -42,30 +21,22 @@ else
   fi
 fi
 
-if [ -d "$HOMEBREW_PREFIX" ]; then
-  if ! [ -r "$HOMEBREW_PREFIX" ]; then
-    sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
-  fi
-else
-  sudo mkdir "$HOMEBREW_PREFIX"
-  sudo chflags norestricted "$HOMEBREW_PREFIX"
-  sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
-fi
+sudo mkdir -p "$HOMEBREW_PREFIX"
+sudo chflags norestricted "$HOMEBREW_PREFIX"
+sudo chown -R "$LOGNAME:admin" "$HOMEBREW_PREFIX"
 
 if ! command -v brew > /dev/null 2>&1; then
-  fancy_echo "Installing Homebrew ..."
-   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
-
-  append_to_zshrc "eval \"\$($HOMEBREW_PREFIX/bin/brew shellenv)\""
+  echo "Installing Homebrew ..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
 
 if brew list | grep -Fq brew-cask; then
-  fancy_echo "Uninstalling old Homebrew-Cask ..."
+  echo "Uninstalling old Homebrew-Cask ..."
   brew uninstall --force brew-cask
 fi
 
-fancy_echo "Updating Homebrew formulae ..."
+echo "Updating Homebrew formulae ..."
 brew update --force
 
 brew bundle --file=- <<EOF
@@ -107,6 +78,7 @@ cask "quicklook-json"
 brew "ctags"
 brew "gnupg2"
 brew "openssl"
+brew "shellcheck"
 brew "reattach-to-user-namespace"
 brew "gcc"
 brew "gnu-sed"
@@ -123,6 +95,8 @@ brew "grep"
 brew "rename"
 brew "jq"
 brew "forego"
+
+# advisr
 brew "pkg-config"
 brew "cairo"
 brew "pango"
@@ -131,35 +105,18 @@ brew "jpeg"
 brew "giflib"
 brew "librsvg"
 brew "pixman"
-brew "shellcheck"
-brew "httpie"
+
 
 # languages
-
-brew "nodenv"
-brew "node-build"
-brew "nodenv-nvmrc"
-brew "rbenv"
-brew "ruby-build"
+#
+# switch to asdf
 
 EOF
 
-# shellcheck disable=SC2016
-fancy_echo "Adding rbenv init to zsh profile"
-append_to_zshrc "eval \"$(rbenv init - --no-rehash)\"" 1
-eval "$(rbenv init -)"
-
-fancy_echo "Adding nodenv init to zsh profile"
-append_to_zshrc "eval \"$(nodenv init -)\"" 1
-eval "$(nodenv init -)"
-
-if [ "$(command -v zsh)" != "$HOMEBREW_PREFIX/bin/zsh" ]; then
-  shell_path="$(command -v zsh)"
-
-  fancy_echo "Changing your shell to zsh ..."
-  if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-    fancy_echo "Adding '$shell_path' to /etc/shells"
-    sudo sh -c "echo $shell_path >> /etc/shells"
-  fi
-  sudo chsh -s "$shell_path" "$USER"
+shell_path="$(command -v zsh)"
+echo "Ensure shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+  echo "Add '$shell_path' to /etc/shells"
+  sudo sh -c "echo $shell_path >> /etc/shells"
 fi
+sudo chsh -s "$shell_path" $USER
