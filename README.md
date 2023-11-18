@@ -29,16 +29,16 @@ Download, review, then execute the script:
 #### Mac
 
 ```sh
-curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac' | sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac' | sh
 ```
 #### Linux
 
 ```sh
-curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/linux' | sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/linux' | sh
 ```
 or
 ```sh
-wget -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
+wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/linux' | sh
 ```
 
 #### Windows
