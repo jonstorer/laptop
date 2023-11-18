@@ -31,27 +31,26 @@ fi
 
 sudo apt full-upgrade
 
-sudo apt install -y <<EOF
-build-essential
-gcc
-zsh
-exuberant-ctags
-git
-htop
-hub
-openssl
-openssh-server
-silversearcher-ag
-tmate
-tmux
-vim
-
-docker-ce
-docker-ce-cli
-containerd.io
-docker-buildx-plugin
+sudo apt install -y \
+build-essential \
+gcc \
+zsh \
+exuberant-ctags \
+git \
+htop \
+hub \
+openssl \
+openssh-server \
+silversearcher-ag \
+tmate \
+tmux \
+vim \
+ \
+docker-ce \
+docker-ce-cli \
+containerd.io \
+docker-buildx-plugin \
 docker-compose-plugin
-EOF
 
 #sudo systemctl enable ssh
 #sudo systemctl start ssh
