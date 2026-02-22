@@ -61,21 +61,10 @@ if [ ! -d "$HOME/.asdf" ]; then
     echo "Node.js $node_version set as global default"
   fi
 
-  echo "legacy_version_file = yes" > "$HOME/.asdfrc"
-  echo "Created ~/.asdfrc for .nvmrc / .node-version support"
+  # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
 fi
 
-if [ -d "$HOME/.asdf" ] && ! grep -q "asdf.sh" "$HOME/.zshrc" 2>/dev/null; then
-  {
-    echo ''
-    echo '# asdf version manager'
-    # shellcheck disable=SC2016
-    echo '. "$HOME/.asdf/asdf.sh"'
-  } >> "$HOME/.zshrc"
-  echo "Added asdf to ~/.zshrc"
-fi
-
-shell_path="$(command -v zsh)"
+shell_path="$(command -v zsh)"="$(command -v zsh)"
 echo "Ensure shell is zsh at '$shell_path' ..."
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   echo "Add '$shell_path' to /etc/shells"
