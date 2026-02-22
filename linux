@@ -17,7 +17,8 @@ sudo apt full-upgrade
 
 sudo apt-get install -y ca-certificates curl gnupg
 
-if [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
+# Skip Docker setup when LAPTOP_SKIP_DOCKER=1 (e.g. WSL with Docker Desktop)
+if [ -z "${LAPTOP_SKIP_DOCKER}" ] && [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
   sudo install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -31,33 +32,41 @@ fi
 
 sudo apt full-upgrade
 
-sudo apt install -y \
-build-essential \
-gcc \
-zsh \
-exuberant-ctags \
-git \
-htop \
-hub \
-openssl \
-openssh-server \
-silversearcher-ag \
-tmate \
-tmux \
-vim \
- \
-docker-ce \
-docker-ce-cli \
-containerd.io \
-docker-buildx-plugin \
-docker-compose-plugin
+apt_packages="build-essential gcc libssl-dev zsh exuberant-ctags git htop hub jq gnupg2 openssl openssh-server silversearcher-ag shellcheck tmate tmux vim watch"
+if [ -z "${LAPTOP_SKIP_DOCKER}" ]; then
+  apt_packages="$apt_packages docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+fi
+# shellcheck disable=SC2086
+sudo apt install -y $apt_packages
 
-#sudo systemctl enable ssh
-#sudo systemctl start ssh
+# Install asdf and Node.js
+if [ ! -d "$HOME/.asdf" ]; then
+  echo "Setting up asdf and Node.js ..."
+  git clone https://github.com/asdf-vm/asdf.git "$HOME/.asdf" --branch v0.14.1
+  # shellcheck disable=SC1091
+  . "$HOME/.asdf/asdf.sh"
 
-#sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-#sudo iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
-#sudo iptables-save
+  asdf plugin add nodejs 2>/dev/null || true
+  asdf install nodejs lts 2>/dev/null || true
+  node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
+  if [ -n "$node_version" ]; then
+    asdf global nodejs "$node_version"
+    echo "Node.js $node_version set as global default"
+  fi
+
+  echo "legacy_version_file = yes" > "$HOME/.asdfrc"
+  echo "Created ~/.asdfrc for .nvmrc / .node-version support"
+fi
+
+if [ -d "$HOME/.asdf" ] && ! grep -q "asdf.sh" "$HOME/.zshrc" 2>/dev/null; then
+  {
+    echo ''
+    echo '# asdf version manager'
+    # shellcheck disable=SC2016
+    echo '. "$HOME/.asdf/asdf.sh"'
+  } >> "$HOME/.zshrc"
+  echo "Added asdf to ~/.zshrc"
+fi
 
 shell_path="$(command -v zsh)"
 echo "Ensure shell is zsh at '$shell_path' ..."

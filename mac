@@ -8,6 +8,7 @@ sudo -v
 # Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
+# shellcheck disable=SC2154
 trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
@@ -15,7 +16,7 @@ if [ "$(uname -m)" = "x86_64" ]; then
   HOMEBREW_PREFIX="/usr/local"
 else
   HOMEBREW_PREFIX="/opt/homebrew"
-  if [ "$(sysctl -n sysctl.proc_translated | awk -F': ' '{print $2}')" = "0" ]; then
+  if [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = "0" ]; then
     echo "Rosetta Folder does not exist or Rosetta service is not running. Installing Rosetta..."
     sudo softwareupdate --install-rosetta --agree-to-license
   fi
@@ -40,19 +41,6 @@ echo "Updating Homebrew formulae ..."
 brew update --force
 
 brew bundle --file=- <<EOF
-tap "homebrew/services"
-tap "homebrew/cask-versions"
-tap "nodenv/nodenv"
-
-# Microsoft Casks
-cask "dotnet-sdk"
-cask "visual-studio"
-cask "visual-studio-code"
-cask "microsoft-teams"
-cask "microsoft-remote-desktop"
-cask "powershell"
-
-# Mac Casks
 cask "alfred"
 cask "docker"
 cask "vagrant"
@@ -65,9 +53,6 @@ cask "slack"
 cask "spotify"
 cask "macdown"
 cask "textmate"
-cask "utm"
-cask "navicat-for-sqlite"
-cask "pgadmin4"
 
 cask "karabiner-elements"
 cask "ngrok"
@@ -75,15 +60,12 @@ cask "quicklook-csv"
 cask "quicklook-json"
 
 # Libraries & Tools
-brew "ctags"
 brew "gnupg2"
 brew "openssl"
 brew "shellcheck"
 brew "reattach-to-user-namespace"
 brew "gcc"
-brew "gnu-sed"
 brew "git"
-brew "hub"
 brew "htop"
 brew "watch"
 brew "the_silver_searcher"
@@ -92,26 +74,42 @@ brew "vim"
 brew "zsh"
 brew "tmate"
 brew "grep"
-brew "rename"
 brew "jq"
 brew "forego"
-
-# advisr
-brew "pkg-config"
-brew "cairo"
-brew "pango"
-brew "libpng"
-brew "jpeg"
-brew "giflib"
-brew "librsvg"
-brew "pixman"
-
+brew "asdf"
 
 # languages
-#
-# switch to asdf
-
 EOF
+
+# Configure asdf and Node.js
+if [ -f "$(brew --prefix asdf 2>/dev/null)/libexec/asdf.sh" ]; then
+  echo "Setting up asdf and Node.js ..."
+  # shellcheck disable=SC1091
+  . "$(brew --prefix asdf)/libexec/asdf.sh"
+
+  asdf plugin add nodejs 2>/dev/null || true
+  asdf install nodejs lts 2>/dev/null || true
+  node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
+  if [ -n "$node_version" ]; then
+    asdf global nodejs "$node_version"
+    echo "Node.js $node_version set as global default"
+  fi
+
+  if [ ! -f "$HOME/.asdfrc" ]; then
+    echo "legacy_version_file = yes" > "$HOME/.asdfrc"
+    echo "Created ~/.asdfrc for .nvmrc / .node-version support"
+  fi
+
+  if ! grep -q "asdf.sh" "$HOME/.zshrc" 2>/dev/null; then
+    {
+      echo ''
+      echo '# asdf version manager'
+      # shellcheck disable=SC2016
+      echo '. "$(brew --prefix asdf)/libexec/asdf.sh"'
+    } >> "$HOME/.zshrc"
+    echo "Added asdf to ~/.zshrc"
+  fi
+fi
 
 shell_path="$(command -v zsh)"
 echo "Ensure shell is zsh at '$shell_path' ..."
@@ -119,4 +117,4 @@ if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   echo "Add '$shell_path' to /etc/shells"
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
-sudo chsh -s "$shell_path" $USER
+sudo chsh -s "$shell_path" "$USER"

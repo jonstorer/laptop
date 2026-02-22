@@ -1,29 +1,83 @@
+# Welcome to the machine script!
+
 Write-Host "Running laptop script..."
 
-Set-ExecutionPolicy -ExecutionPolicy Bypass
-
-IF(-Not (Test-Path -Path $profile -PathType Leaf)){
-  Write-Host "Creating Profile at '$profile'";
-
-  New-Item -Path (Split-Path -Path $profile) -Name (Split-Path -Leaf $profile) -ItemType File -Force;
+# Require Administrator for WSL installation
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-Not $isAdmin) {
+  Write-Host "This script must be run as Administrator (required for WSL setup). Right-click PowerShell and 'Run as Administrator'." -ForegroundColor Red
+  exit 1
 }
 
-If(-Not (Get-Command choco -errorAction SilentlyContinue)){
-  Write-Host "Installing Chocolatey ..."
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 
-  Set-ExecutionPolicy Bypass -Scope Process -Force;
-  [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072;
+# Ensure PowerShell profile exists
+if (-Not (Test-Path -Path $PROFILE -PathType Leaf)) {
+  Write-Host "Creating profile at '$PROFILE'"
+  New-Item -Path (Split-Path -Path $PROFILE) -ItemType Directory -Force | Out-Null
+  New-Item -Path $PROFILE -ItemType File -Force | Out-Null
+}
+
+# Install WSL and Ubuntu if not present
+$wslReady = $false
+try {
+  $null = wsl -e echo "ok" 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    $wslReady = $true
+  }
+} catch {
+  # WSL not available
+}
+
+if (-Not $wslReady) {
+  Write-Host "Installing WSL and Ubuntu ..."
+  Write-Host "This may require a reboot. If prompted, restart your computer and run this script again." -ForegroundColor Yellow
+  wsl --install -d Ubuntu --no-launch
+
+  # Check if reboot is needed (WSL often requires reboot after first install)
+  Start-Sleep -Seconds 8
+  $wslReady = $false
+  try {
+    $null = wsl -e echo "ok" 2>&1
+    if ($LASTEXITCODE -eq 0) { $wslReady = $true }
+  } catch { }
+
+  if (-Not $wslReady) {
+    Write-Host ""
+    Write-Host "WSL installation requires a reboot. Please restart your computer, then run this script again." -ForegroundColor Yellow
+    exit 0
+  }
+}
+
+Write-Host "WSL is ready."
+
+# Install or update Chocolatey (for Windows apps)
+if (-Not (Get-Command choco -ErrorAction SilentlyContinue)) {
+  Write-Host "Installing Chocolatey ..."
+  [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
   iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 } else {
   Write-Host "Updating Chocolatey ..."
-
-  choco upgrade chocolatey
+  choco upgrade chocolatey -y
 }
 
-# Command line utils
+Write-Host "Installing Windows applications ..."
 
-Write-Host "Installing Command Line Utilities ..."
+choco upgrade -y `
+  git `
+  vscode `
+  docker-desktop `
+  googlechrome `
+  slack `
+  powershell
 
-choco upgrade --yes openssl git vim notepadplusplus.install visualstudio2022community dotpeek
-
-Write-Host "Done."
+Write-Host ""
+Write-Host "Step 1 complete. Your Windows machine is ready for the Linux environment." -ForegroundColor Green
+Write-Host ""
+Write-Host "Next: Run the Linux script inside WSL to set up asdf, Node.js, zsh, and dev tools." -ForegroundColor Yellow
+Write-Host "See the README for instructions. You will need to:" -ForegroundColor Yellow
+Write-Host "  1. Open WSL (run 'wsl' or open Windows Terminal)" -ForegroundColor Cyan
+Write-Host "  2. If first time: complete Ubuntu username/password setup" -ForegroundColor Cyan
+Write-Host "  3. Run the Linux script from the README (use LAPTOP_SKIP_DOCKER=1 for WSL)" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Docker: Enable 'Use the WSL 2 based engine' in Docker Desktop Settings > General." -ForegroundColor Cyan
