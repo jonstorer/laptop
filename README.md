@@ -82,9 +82,9 @@ What it sets up
 
 Uses [Homebrew](http://brew.sh/) for package management. Supports Intel (x86_64) and Apple Silicon (Rosetta installed if needed).
 
-**Casks:** alfred, docker, vagrant, google-chrome, iterm2, licecap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, quicklook-csv, quicklook-json
+**Casks:** alfred, docker, vagrant, google-chrome, iterm2, licecap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, qlstephen
 
-**CLI tools:** gnupg2, openssl, shellcheck, reattach-to-user-namespace, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
+**CLI tools:** gnupg, openssl, shellcheck, reattach-to-user-namespace, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
 
 **Node.js:** asdf with asdf-nodejs plugin; installs current LTS and sets as global default. Supports `.nvmrc` and `.node-version` via `legacy_version_file` in `~/.asdfrc`.
 

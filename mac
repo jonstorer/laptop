@@ -56,11 +56,10 @@ cask "textmate"
 
 cask "karabiner-elements"
 cask "ngrok"
-cask "quicklook-csv"
-cask "quicklook-json"
+cask "qlstephen"
 
 # Libraries & Tools
-brew "gnupg2"
+brew "gnupg"
 brew "openssl"
 brew "shellcheck"
 brew "reattach-to-user-namespace"
@@ -95,20 +94,7 @@ if [ -f "$(brew --prefix asdf 2>/dev/null)/libexec/asdf.sh" ]; then
     echo "Node.js $node_version set as global default"
   fi
 
-  if [ ! -f "$HOME/.asdfrc" ]; then
-    echo "legacy_version_file = yes" > "$HOME/.asdfrc"
-    echo "Created ~/.asdfrc for .nvmrc / .node-version support"
-  fi
-
-  if ! grep -q "asdf.sh" "$HOME/.zshrc" 2>/dev/null; then
-    {
-      echo ''
-      echo '# asdf version manager'
-      # shellcheck disable=SC2016
-      echo '. "$(brew --prefix asdf)/libexec/asdf.sh"'
-    } >> "$HOME/.zshrc"
-    echo "Added asdf to ~/.zshrc"
-  fi
+  # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
 fi
 
 shell_path="$(command -v zsh)"
