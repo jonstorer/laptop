@@ -50,7 +50,7 @@ if [ ! -d "$HOME/.asdf" ]; then
   asdf install nodejs lts 2>/dev/null || true
   node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
   if [ -n "$node_version" ]; then
-    asdf global nodejs "$node_version"
+    asdf set -u nodejs "$node_version"
     echo "Node.js $node_version set as global default"
   fi
 
