@@ -32,14 +32,14 @@ Download, review, then execute the script:
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac' | sh
 ```
-#### Linux
+#### Ubuntu
 
 ```sh
-curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/linux' | sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
 ```
 or
 ```sh
-wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/linux' | sh
+wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
 ```
 
 #### Raspberry Pi
@@ -58,10 +58,10 @@ Invoke-RestMethod -Uri https://raw.githubusercontent.com/jonstorer/laptop/main/w
 
 This installs WSL2, Ubuntu, Chocolatey, and Windows apps. Reboot if prompted.
 
-**Step 2 – Linux setup** (from inside WSL, e.g. run `wsl` or open Windows Terminal):
+**Step 2 – Ubuntu setup** (from inside WSL, e.g. run `wsl` or open Windows Terminal):
 
 ```sh
-LAPTOP_SKIP_DOCKER=1 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/linux' | sh
+LAPTOP_SKIP_DOCKER=1 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
 ```
 
 The `LAPTOP_SKIP_DOCKER=1` skips Docker installation (Docker Desktop provides it to WSL).
@@ -90,26 +90,26 @@ Uses [Homebrew](http://brew.sh/) for package management. Supports Intel (x86_64)
 
 Sets zsh as the default shell.
 
-#### Linux
+#### Ubuntu
 
 For desktop machines (with display). Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, exuberant-ctags, git, htop, hub, jq, gnupg2, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. asdf with Node.js LTS (same as Mac). Sets zsh as the default shell.
 
 #### Raspberry Pi
 
-Same as Linux plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 so you can access the Pi remotely.
+Same as Ubuntu plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 so you can access the Pi remotely.
 
 #### Windows (two steps)
 
 **Step 1** sets up [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) with Ubuntu, [Chocolatey](https://chocolatey.org/), and Windows apps: git, vscode, docker-desktop, googlechrome, slack, powershell. **Requires Administrator**; reboot if prompted.
 
-**Step 2** runs the Linux script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1`—Docker Desktop provides Docker to WSL. After both steps you get the same environment as Mac/Linux (asdf, Node.js LTS, zsh, tmux, etc.).
+**Step 2** runs the Ubuntu script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1`—Docker Desktop provides Docker to WSL. After both steps you get the same environment as Mac/Ubuntu (asdf, Node.js LTS, zsh, tmux, etc.).
 
 It should take less than 15 minutes to install (depends on your machine).
 
 Contributing
 ------------
 
-Edit the mac, linux, pi, or windows file as appropriate.
+Edit the mac, ubuntu, pi, or windows file as appropriate.
 Document in the `README.md` file.
 Follow shell style guidelines by using [ShellCheck] and [Syntastic].
 

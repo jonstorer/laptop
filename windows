@@ -72,12 +72,12 @@ choco upgrade -y `
   powershell
 
 Write-Host ""
-Write-Host "Step 1 complete. Your Windows machine is ready for the Linux environment." -ForegroundColor Green
+Write-Host "Step 1 complete. Your Windows machine is ready for the Ubuntu environment." -ForegroundColor Green
 Write-Host ""
-Write-Host "Next: Run the Linux script inside WSL to set up asdf, Node.js, zsh, and dev tools." -ForegroundColor Yellow
+Write-Host "Next: Run the Ubuntu script inside WSL to set up asdf, Node.js, zsh, and dev tools." -ForegroundColor Yellow
 Write-Host "See the README for instructions. You will need to:" -ForegroundColor Yellow
 Write-Host "  1. Open WSL (run 'wsl' or open Windows Terminal)" -ForegroundColor Cyan
 Write-Host "  2. If first time: complete Ubuntu username/password setup" -ForegroundColor Cyan
-Write-Host "  3. Run the Linux script from the README (use LAPTOP_SKIP_DOCKER=1 for WSL)" -ForegroundColor Cyan
+Write-Host "  3. Run the Ubuntu script from the README (use LAPTOP_SKIP_DOCKER=1 for WSL)" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Docker: Enable 'Use the WSL 2 based engine' in Docker Desktop Settings > General." -ForegroundColor Cyan
