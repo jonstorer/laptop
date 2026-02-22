@@ -16,6 +16,7 @@ Support For:
 * macOs Big Sur  11
 * macOs Monterey 12
 * Ubuntu 20.04
+* Raspberry Pi (Ubuntu-based)
 * Windows 11
 
 Older versions may work but aren't regularly tested.
@@ -29,19 +30,41 @@ Download, review, then execute the script:
 #### Mac
 
 ```sh
-curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac' | sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac' | sh
 ```
-#### Linux
+#### Ubuntu
 
 ```sh
-curl -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
+```
+or
+```sh
+wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
 ```
 
-#### Windows
+#### Raspberry Pi
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/pi' | sh
+```
+
+#### Windows (two steps required)
+
+**Step 1 – Windows setup** (run PowerShell as Administrator):
 
 ```ps1
 Invoke-RestMethod -Uri https://raw.githubusercontent.com/jonstorer/laptop/main/windows | Invoke-Expression
 ```
+
+This installs WSL2, Ubuntu, Chocolatey, and Windows apps. Reboot if prompted.
+
+**Step 2 – Ubuntu setup** (from inside WSL, e.g. run `wsl` or open Windows Terminal):
+
+```sh
+LAPTOP_SKIP_DOCKER=1 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
+```
+
+The `LAPTOP_SKIP_DOCKER=1` skips Docker installation (Docker Desktop provides it to WSL).
 
 Debugging
 ---------
@@ -55,133 +78,38 @@ Or, attach the whole log file as an attachment.
 What it sets up
 ---------------
 
-macOS tools:
+#### Mac
 
-* [Homebrew] for managing operating system libraries.
+Uses [Homebrew](http://brew.sh/) for package management. Supports Intel (x86_64) and Apple Silicon (Rosetta installed if needed).
 
-[Homebrew]: http://brew.sh/
+**Casks:** alfred, docker, vagrant, google-chrome, iterm2, licecap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, quicklook-csv, quicklook-json
 
-Unix tools:
+**CLI tools:** gnupg2, openssl, shellcheck, reattach-to-user-namespace, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
 
-* [Exuberant Ctags] for indexing files for vim tab completion
-* [Git] for version control
-* [OpenSSL] for Transport Layer Security (TLS)
-* [RCM] for managing company and personal dotfiles
-* [The Silver Searcher] for finding things in files
-* [Tmux] for saving project state and switching between projects
-* [Zsh] as your shell
+**Node.js:** asdf with asdf-nodejs plugin; installs current LTS and sets as global default. Supports `.nvmrc` and `.node-version` via `legacy_version_file` in `~/.asdfrc`.
 
-[Exuberant Ctags]: http://ctags.sourceforge.net/
-[Git]: https://git-scm.com/
-[OpenSSL]: https://www.openssl.org/
-[RCM]: https://github.com/thoughtbot/rcm
-[The Silver Searcher]: https://github.com/ggreer/the_silver_searcher
-[Tmux]: http://tmux.github.io/
-[Zsh]: http://www.zsh.org/
+Sets zsh as the default shell.
 
-Heroku tools:
+#### Ubuntu
 
-* [Heroku Toolbelt] and [Parity] for interacting with the Heroku API
+For desktop machines (with display). Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, exuberant-ctags, git, htop, hub, jq, gnupg2, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. asdf with Node.js LTS (same as Mac). Sets zsh as the default shell.
 
-[Heroku Toolbelt]: https://toolbelt.heroku.com/
-[Parity]: https://github.com/thoughtbot/parity
+#### Raspberry Pi
 
-GitHub tools:
+Same as Ubuntu plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 so you can access the Pi remotely.
 
-* [Hub] for interacting with the GitHub API
+#### Windows (two steps)
 
-[Hub]: http://hub.github.com/
+**Step 1** sets up [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) with Ubuntu, [Chocolatey](https://chocolatey.org/), and Windows apps: git, vscode, docker-desktop, googlechrome, slack, powershell. **Requires Administrator**; reboot if prompted.
 
-Image tools:
-
-* [ImageMagick] for cropping and resizing images
-
-Testing tools:
-
-* [Qt] for headless JavaScript testing via Capybara Webkit
-
-[Qt]: http://qt-project.org/
-
-Programming languages and configuration:
-
-* [Bundler] for managing Ruby libraries
-* [Node.js] and [NPM], for running apps and installing JavaScript packages
-* [Rbenv] for managing versions of Ruby
-* [Ruby Build] for installing Rubies
-* [Ruby] stable for writing general-purpose code
-
-[Bundler]: http://bundler.io/
-[ImageMagick]: http://www.imagemagick.org/
-[Node.js]: http://nodejs.org/
-[NPM]: https://www.npmjs.org/
-[Rbenv]: https://github.com/sstephenson/rbenv
-[Ruby Build]: https://github.com/sstephenson/ruby-build
-[Ruby]: https://www.ruby-lang.org/en/
-
-Databases:
-
-* [Postgres] for storing relational data
-* [Redis] for storing key-value data
-
-[Postgres]: http://www.postgresql.org/
-[Redis]: http://redis.io/
+**Step 2** runs the Ubuntu script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1`—Docker Desktop provides Docker to WSL. After both steps you get the same environment as Mac/Ubuntu (asdf, Node.js LTS, zsh, tmux, etc.).
 
 It should take less than 15 minutes to install (depends on your machine).
-
-Customize in `~/.laptop.local`
-------------------------------
-
-Your `~/.laptop.local` is run at the end of the Laptop script.
-Put your customizations there.
-For example:
-
-```sh
-#!/bin/sh
-
-brew bundle --file=- <<EOF
-brew "Caskroom/cask/dockertoolbox"
-brew "go"
-brew "ngrok"
-brew "watch"
-EOF
-
-default_docker_machine() {
-  docker-machine ls | grep -Fq "default"
-}
-
-if ! default_docker_machine; then
-  docker-machine create --driver virtualbox default
-fi
-
-default_docker_machine_running() {
-  default_docker_machine | grep -Fq "Running"
-}
-
-if ! default_docker_machine_running; then
-  docker-machine start default
-fi
-
-fancy_echo "Cleaning up old Homebrew formulae ..."
-brew cleanup
-brew cask cleanup
-
-if [ -r "$HOME/.rcrc" ]; then
-  fancy_echo "Updating dotfiles ..."
-  rcup
-fi
-```
-
-Write your customizations such that they can be run safely more than once.
-See the `mac` script for examples.
-
-Laptop functions such as `fancy_echo` and
-`gem_install_or_update`
-can be used in your `~/.laptop.local`.
 
 Contributing
 ------------
 
-Edit the `mac` file.
+Edit the mac, ubuntu, pi, or windows file as appropriate.
 Document in the `README.md` file.
 Follow shell style guidelines by using [ShellCheck] and [Syntastic].
 

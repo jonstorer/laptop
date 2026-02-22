@@ -2,89 +2,83 @@
 
 # Welcome to the raspberry pi setup script!
 
-fancy_echo() {
-  local msg="$1"; shift
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
 
-  printf "\n**\n" "$@"
-  printf "** $msg" "$@"
-  printf "\n**\n\n" "$@"
-}
+# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
-append_to_zshrc() {
-  local text="$1" zshrc
-  local skip_new_line="${2:-0}"
-
-  if [ -w "$HOME/.zshrc.local" ]; then
-    zshrc="$HOME/.zshrc.local"
-  else
-    zshrc="$HOME/.zshrc"
-  fi
-
-  if ! grep -Fqs "$text" "$zshrc"; then
-    if [ "$skip_new_line" -eq 1 ]; then
-      printf "%s\n" "$text" >> "$zshrc"
-    else
-      printf "\n%s\n" "$text" >> "$zshrc"
-    fi
-  fi
-}
-
-apt_install() {
-  local package="$1";
-
-  fancy_echo "Installing $package"
-  sudo apt install -y $package
-}
-
+# shellcheck disable=SC2154
 trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
-fancy_echo "Update Apt Cache"
 sudo apt update
+sudo apt full-upgrade
 
-fancy_echo "Upgrade Installed Packages"
-sudo apt upgrade
+sudo apt-get install -y ca-certificates curl gnupg
 
-fancy_echo "Upgrade Distro"
-sudo apt dist-upgrade
+if [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-apt_install build-essential
-apt_install gcc
-apt_install zsh
-apt_install silversearcher-ag
-apt_install git
-apt_install htop
-apt_install hub
-apt_install openssh-server
-apt_install openssl
-apt_install libssl-dev
-apt_install zlib1g-dev
-apt_install tmux
-apt_install vim
-apt_install python3-pip
-apt_install libffi-dev
-apt_install docker.io
+# shellcheck disable=SC1091
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+fi
 
-sudo pip3 install docker-compose
+sudo apt full-upgrade
 
+sudo apt install -y \
+  build-essential gcc libssl-dev \
+  zsh exuberant-ctags git htop hub jq gnupg2 openssl openssh-server \
+  silversearcher-ag shellcheck tmate tmux vim watch \
+  docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Headless: enable SSH for remote access
 sudo systemctl enable ssh
 sudo systemctl start ssh
 
+# Headless: allow SSH on port 22
 sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 sudo iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
 sudo iptables-save
 
-if [ ! -d "$HOME/.bin/" ]; then mkdir "$HOME/.bin"; fi
-if [ ! -f "$HOME/.zshrc" ]; then touch "$HOME/.zshrc"; fi
+# Install asdf and Node.js
+if [ ! -d "$HOME/.asdf" ]; then
+  echo "Setting up asdf and Node.js ..."
+  git clone https://github.com/asdf-vm/asdf.git "$HOME/.asdf" --branch v0.14.1
+  # shellcheck disable=SC1091
+  . "$HOME/.asdf/asdf.sh"
 
-append_to_zshrc 'export PATH="$HOME/.bin:$PATH"'
+  asdf plugin add nodejs 2>/dev/null || true
+  asdf install nodejs lts 2>/dev/null || true
+  node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
+  if [ -n "$node_version" ]; then
+    asdf global nodejs "$node_version"
+    echo "Node.js $node_version set as global default"
+  fi
 
-shell_path="$(command -v zsh)"
-fancy_echo "Changing your shell to zsh at '$shell_path' ..."
-
-if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-  fancy_echo "Adding '$shell_path' to /etc/shells"
-  sudo sh -c "echo $shell_path >> /etc/shells"
+  echo "legacy_version_file = yes" > "$HOME/.asdfrc"
+  echo "Created ~/.asdfrc for .nvmrc / .node-version support"
 fi
 
-sudo chsh -s "$shell_path" $USER
+if [ -d "$HOME/.asdf" ] && ! grep -q "asdf.sh" "$HOME/.zshrc" 2>/dev/null; then
+  {
+    echo ''
+    echo '# asdf version manager'
+    # shellcheck disable=SC2016
+    echo '. "$HOME/.asdf/asdf.sh"'
+  } >> "$HOME/.zshrc"
+  echo "Added asdf to ~/.zshrc"
+fi
+
+shell_path="$(command -v zsh)"
+echo "Ensure shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+  echo "Add '$shell_path' to /etc/shells"
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+sudo chsh -s "$shell_path" "$USER"
