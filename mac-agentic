@@ -242,8 +242,7 @@ fi
 # Restart affected applications                                               #
 ###############################################################################
 
-for app in "Calendar" "Contacts" "Dock" "Finder" \
-  "Mail" "Music" "Safari" "SystemUIServer"; do
+for app in "Dock" "Finder" "Safari" "SystemUIServer"; do
   killall "$app" > /dev/null 2>&1 || true
 done
 
