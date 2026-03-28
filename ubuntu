@@ -30,9 +30,9 @@ if [ -z "${LAPTOP_SKIP_DOCKER}" ] && [ ! -e "/etc/apt/keyrings/docker.gpg" ]; th
     sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 fi
 
-sudo apt full-upgrade
+sudo apt update
 
-apt_packages="build-essential gcc libssl-dev zsh exuberant-ctags git htop hub jq gnupg2 openssl openssh-server silversearcher-ag shellcheck tmate tmux vim watch"
+apt_packages="build-essential gcc libssl-dev zsh exuberant-ctags git htop gh jq gnupg2 openssl openssh-server silversearcher-ag shellcheck tmate tmux vim watch"
 if [ -z "${LAPTOP_SKIP_DOCKER}" ]; then
   apt_packages="$apt_packages docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
 fi
@@ -42,7 +42,7 @@ sudo apt install -y $apt_packages
 # Install asdf and Node.js
 if [ ! -d "$HOME/.asdf" ]; then
   echo "Setting up asdf and Node.js ..."
-  git clone https://github.com/asdf-vm/asdf.git "$HOME/.asdf" --branch v0.14.1
+  git clone https://github.com/asdf-vm/asdf.git "$HOME/.asdf" --branch v0.16.0
   # shellcheck disable=SC1091
   . "$HOME/.asdf/asdf.sh"
 
@@ -57,7 +57,7 @@ if [ ! -d "$HOME/.asdf" ]; then
   # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
 fi
 
-shell_path="$(command -v zsh)"="$(command -v zsh)"
+shell_path="$(command -v zsh)"
 echo "Ensure shell is zsh at '$shell_path' ..."
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   echo "Add '$shell_path' to /etc/shells"

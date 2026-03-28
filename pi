@@ -29,27 +29,27 @@ if [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
     sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 fi
 
-sudo apt full-upgrade
+sudo apt update
 
 sudo apt install -y \
   build-essential gcc libssl-dev \
-  zsh exuberant-ctags git htop hub jq gnupg2 openssl openssh-server \
+  zsh exuberant-ctags git htop gh jq gnupg2 openssl openssh-server \
   silversearcher-ag shellcheck tmate tmux vim watch \
+  iptables-persistent \
   docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # Headless: enable SSH for remote access
 sudo systemctl enable ssh
 sudo systemctl start ssh
 
-# Headless: allow SSH on port 22
+# Headless: allow SSH on port 22 and persist rules across reboots
 sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-sudo iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
-sudo iptables-save
+sudo netfilter-persistent save
 
 # Install asdf and Node.js
 if [ ! -d "$HOME/.asdf" ]; then
   echo "Setting up asdf and Node.js ..."
-  git clone https://github.com/asdf-vm/asdf.git "$HOME/.asdf" --branch v0.14.1
+  git clone https://github.com/asdf-vm/asdf.git "$HOME/.asdf" --branch v0.16.0
   # shellcheck disable=SC1091
   . "$HOME/.asdf/asdf.sh"
 
@@ -64,7 +64,7 @@ if [ ! -d "$HOME/.asdf" ]; then
   # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
 fi
 
-shell_path="$(command -v zsh)"="$(command -v zsh)"
+shell_path="$(command -v zsh)"
 echo "Ensure shell is zsh at '$shell_path' ..."
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
   echo "Add '$shell_path' to /etc/shells"
