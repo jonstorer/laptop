@@ -112,13 +112,10 @@ defaults write com.google.iterm2 PromptOnQuit -bool true
 defaults write com.google.iterm2 QuitWhenAllWindowsClosed -bool true
 
 # Disable Time Machine — not needed on an autonomous agent box
-defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
-hash tmutil > /dev/null 2>&1 && sudo tmutil disable || true
-
-# Set OPENCLAW_KEEP_TIME_MACHINE=1 to skip the above
-if [ "${OPENCLAW_KEEP_TIME_MACHINE:-0}" = "1" ]; then
-  defaults delete com.apple.TimeMachine DoNotOfferNewDisksForBackup 2>/dev/null || true
-  hash tmutil > /dev/null 2>&1 && sudo tmutil enable || true
+# Set OPENCLAW_KEEP_TIME_MACHINE=1 to skip
+if [ "${OPENCLAW_KEEP_TIME_MACHINE:-0}" != "1" ]; then
+  defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
+  hash tmutil > /dev/null 2>&1 && sudo tmutil disable || true
 fi
 
 for app in "Dock" "Finder" "SystemUIServer"; do
