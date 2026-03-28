@@ -1,0 +1,234 @@
+#!/bin/sh
+
+# Welcome to the machine script!
+
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
+
+# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
+
+# shellcheck disable=SC2154
+trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+set -e
+
+if ! command -v brew > /dev/null 2>&1; then
+  echo "Installing Homebrew ..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
+
+echo "Updating Homebrew formulae ..."
+brew update --force
+
+brew bundle --file=- <<EOF
+cask "alfred"
+cask "docker-desktop"
+cask "google-chrome"
+cask "iterm2"
+cask "kap"
+cask "postman"
+cask "rectangle"
+cask "slack"
+cask "spotify"
+cask "macdown"
+cask "textmate"
+
+cask "karabiner-elements"
+cask "ngrok"
+cask "qlstephen"
+
+# Libraries & Tools
+brew "gnupg"
+brew "openssl"
+brew "shellcheck"
+brew "gcc"
+brew "git"
+brew "htop"
+brew "watch"
+brew "the_silver_searcher"
+brew "tmux"
+brew "vim"
+brew "zsh"
+brew "tmate"
+brew "grep"
+brew "jq"
+brew "forego"
+brew "asdf"
+EOF
+
+# Configure asdf and Node.js
+if [ -f "$(brew --prefix asdf 2>/dev/null)/libexec/asdf.sh" ]; then
+  echo "Setting up asdf and Node.js ..."
+  # shellcheck disable=SC1091
+  . "$(brew --prefix asdf)/libexec/asdf.sh"
+
+  asdf plugin add nodejs 2>/dev/null || true
+  asdf install nodejs lts 2>/dev/null || true
+  node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
+  if [ -n "$node_version" ]; then
+    asdf set -u nodejs "$node_version"
+    echo "Node.js $node_version set as global default"
+  fi
+
+  # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
+fi
+
+shell_path="$(command -v zsh)"
+echo "Ensure shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+  echo "Add '$shell_path' to /etc/shells"
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+sudo chsh -s "$shell_path" "$USER"
+
+###############################################################################
+# macOS defaults                                                              #
+###############################################################################
+
+echo "Configuring macOS defaults ..."
+
+###############################################################################
+# General UI/UX                                                               #
+###############################################################################
+
+defaults write NSGlobalDomain NSWindowResizeTime -float 0.001
+defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode -bool true
+defaults write NSGlobalDomain PMPrintingExpandedStateForPrint -bool true
+defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
+defaults write com.apple.print.PrintingPrefs "Quit When Finished" -bool true
+defaults write NSGlobalDomain NSQuitAlwaysKeepsWindows -bool false
+defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
+
+# Reveal IP address, hostname, OS version when clicking clock in login window
+sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
+
+
+###############################################################################
+# Trackpad, mouse, keyboard                                                   #
+###############################################################################
+
+defaults write NSGlobalDomain AppleEnableSwipeNavigateWithScrolls -bool true
+defaults -currentHost write NSGlobalDomain com.apple.trackpad.threeFingerHorizSwipeGesture -int 1
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadThreeFingerHorizSwipeGesture -int 1
+defaults write NSGlobalDomain AppleKeyboardUIMode -int 3
+defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true
+defaults write com.apple.universalaccess HIDScrollZoomModifierMask -int 262144
+defaults write com.apple.universalaccess closeViewZoomFollowsFocus -bool true
+defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
+defaults write NSGlobalDomain KeyRepeat -int 1
+
+defaults write NSGlobalDomain AppleLanguages -array "en"
+defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
+defaults write NSGlobalDomain AppleMeasurementUnits -string "Inches"
+defaults write NSGlobalDomain AppleMetricUnits -bool false
+
+defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+
+###############################################################################
+# Screen                                                                      #
+###############################################################################
+
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
+defaults write com.apple.screencapture location -string "$HOME/Desktop"
+defaults write com.apple.screencapture type -string "png"
+defaults write com.apple.screencapture disable-shadow -bool true
+sudo defaults write /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled -bool true 2>/dev/null || true
+
+###############################################################################
+# Finder                                                                      #
+###############################################################################
+
+defaults write com.apple.finder DisableAllAnimations -bool true
+defaults write com.apple.finder ShowExternalHardDrivesOnDesktop -bool true
+defaults write com.apple.finder ShowHardDrivesOnDesktop -bool true
+defaults write com.apple.finder ShowMountedServersOnDesktop -bool true
+defaults write com.apple.finder ShowRemovableMediaOnDesktop -bool true
+defaults write com.apple.finder AppleShowAllFiles -bool false
+defaults write com.apple.finder ShowStatusBar -bool true
+defaults write com.apple.finder ShowPathBar -bool true
+defaults write com.apple.finder FXDefaultSearchScope -string "SCcf"
+defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
+defaults write NSGlobalDomain com.apple.springing.enabled -bool true
+defaults write NSGlobalDomain com.apple.springing.delay -float 0
+defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
+defaults write com.apple.finder OpenWindowForNewRemovableDisk -bool true
+defaults write com.apple.finder FXPreferredViewStyle -string "Nlsv"
+defaults write com.apple.finder WarnOnEmptyTrash -bool false
+defaults write com.apple.NetworkBrowser BrowseAllInterfaces -bool true
+chflags nohidden ~/Library
+
+###############################################################################
+# Dock                                                                        #
+###############################################################################
+
+defaults write com.apple.dock enable-spring-load-actions-on-all-items -bool true
+defaults write com.apple.dock launchanim -bool false
+defaults write com.apple.dock expose-animation-duration -float 0.1
+defaults write com.apple.dock autohide-delay -float 0
+defaults write com.apple.dock autohide-time-modifier -float 0
+defaults write com.apple.dock autohide -bool true
+defaults write com.apple.dock showhidden -bool true
+
+###############################################################################
+# Safari & WebKit                                                             #
+###############################################################################
+
+defaults write com.apple.Safari HomePage -string "about:blank"
+defaults write com.apple.Safari AutoOpenSafeDownloads -bool false
+defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2BackspaceKeyNavigationEnabled -bool true
+defaults write com.apple.Safari ShowFavoritesBar -bool false
+defaults write com.apple.Safari DebugSnapshotsUpdatePolicy -int 2
+defaults write com.apple.Safari IncludeInternalDebugMenu -bool true
+defaults write com.apple.Safari FindOnPageMatchesWordStartsOnly -bool false
+defaults write com.apple.Safari IncludeDevelopMenu -bool true
+defaults write com.apple.Safari WebKitDeveloperExtrasEnabledPreferenceKey -bool true
+defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2DeveloperExtrasEnabled -bool true
+defaults write NSGlobalDomain WebKitDeveloperExtras -bool true
+
+###############################################################################
+# Terminal & iTerm2                                                           #
+###############################################################################
+
+defaults write com.apple.terminal StringEncodings -array 4
+defaults write com.google.iterm2 DimBackgroundWindows -bool false
+defaults write com.google.iterm2 DimInactiveSplitPanes -bool false
+defaults write com.google.iterm2 HideScrollbar -bool true
+defaults write com.google.iterm2 HighlightTabLabels -bool true
+defaults write com.google.iterm2 PromptOnQuit -bool true
+defaults write com.google.iterm2 QuitWhenAllWindowsClosed -bool true
+defaults write com.google.iterm2 ShowFullScreenTabBar -bool true
+
+###############################################################################
+# TextEdit & Disk Utility                                                     #
+###############################################################################
+
+defaults write com.apple.TextEdit RichText -int 0
+defaults write com.apple.TextEdit PlainTextEncoding -int 4
+defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
+defaults write com.apple.DiskUtility DUDebugMenuEnabled -bool true
+defaults write com.apple.DiskUtility advanced-image-options -bool true
+
+###############################################################################
+# DESTRUCTIVE - run only with OSX_DESTRUCTIVE=1                               #
+###############################################################################
+
+if [ "$OSX_DESTRUCTIVE" = "1" ]; then
+  echo "Applying destructive macOS defaults ..."
+  defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
+  hash tmutil > /dev/null 2>&1 && sudo tmutil disable
+  echo "Destructive defaults applied."
+else
+  echo "Skipping destructive defaults. Set OSX_DESTRUCTIVE=1 to disable Time Machine, etc."
+fi
+
+###############################################################################
+# Restart affected applications                                               #
+###############################################################################
+
+for app in "Dock" "Finder" "Safari" "SystemUIServer"; do
+  killall "$app" > /dev/null 2>&1 || true
+done
+
+echo "macOS defaults configured. Some changes require logout/restart to take effect."

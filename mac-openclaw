@@ -1,0 +1,156 @@
+#!/bin/sh
+
+# Welcome to the mac-openclaw machine script!
+# Sets up a Mac to run OpenClaw as a persistent autonomous agent.
+# After this script completes, run: openclaw onboard
+
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
+
+# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
+
+# shellcheck disable=SC2154
+trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+set -e
+
+if ! command -v brew > /dev/null 2>&1; then
+  echo "Installing Homebrew ..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+echo "Updating Homebrew formulae ..."
+brew update --force
+
+brew bundle --file=- <<EOF
+# GUI apps — kept for physical access / debugging
+cask "alfred"
+cask "docker-desktop"
+cask "google-chrome"
+cask "iterm2"
+cask "rectangle"
+cask "slack"
+cask "textmate"
+
+# Tunneling — useful for exposing the gateway or webhooks
+cask "ngrok"
+
+# Libraries & Tools
+brew "gnupg"
+brew "openssl"
+brew "shellcheck"
+brew "gcc"
+brew "git"
+brew "htop"
+brew "watch"
+brew "the_silver_searcher"
+brew "tmux"
+brew "vim"
+brew "zsh"
+brew "tmate"
+brew "grep"
+brew "jq"
+brew "forego"
+
+# Node.js v22 — required by OpenClaw
+brew "node@22"
+EOF
+
+# Put node@22 on PATH for this session
+brew link node@22 --overwrite --force 2>/dev/null || true
+node22_bin="$(brew --prefix node@22 2>/dev/null)/bin"
+if [ -d "$node22_bin" ]; then
+  export PATH="$node22_bin:$PATH"
+fi
+
+shell_path="$(command -v zsh)"
+echo "Ensure shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+  echo "Add '$shell_path' to /etc/shells"
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+sudo chsh -s "$shell_path" "$USER"
+
+###############################################################################
+# macOS defaults                                                              #
+###############################################################################
+
+echo "Configuring macOS defaults ..."
+
+# Keep background processes alive — prevents macOS from auto-terminating services
+defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
+
+# No iCloud document syncing
+defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
+
+# Reveal IP address, hostname, OS version when clicking clock in login window
+sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
+
+# Locale
+defaults write NSGlobalDomain AppleLanguages -array "en"
+defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
+defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+
+# Require password immediately after screensaver
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
+
+# No .DS_Store files on network volumes
+defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
+
+# No confirmation dialogs that could block automation
+defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
+defaults write com.apple.finder WarnOnEmptyTrash -bool false
+
+# Terminal/iTerm2 — for physical access sessions
+defaults write com.apple.terminal StringEncodings -array 4
+defaults write com.google.iterm2 DimBackgroundWindows -bool false
+defaults write com.google.iterm2 DimInactiveSplitPanes -bool false
+defaults write com.google.iterm2 HideScrollbar -bool true
+defaults write com.google.iterm2 PromptOnQuit -bool true
+defaults write com.google.iterm2 QuitWhenAllWindowsClosed -bool true
+
+# Disable Time Machine — not needed on an autonomous agent box
+# Set OPENCLAW_KEEP_TIME_MACHINE=1 to skip
+if [ "${OPENCLAW_KEEP_TIME_MACHINE:-0}" != "1" ]; then
+  defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
+  if hash tmutil > /dev/null 2>&1; then
+    sudo tmutil disable
+  fi
+fi
+
+for app in "Dock" "Finder" "SystemUIServer"; do
+  killall "$app" > /dev/null 2>&1 || true
+done
+
+echo "macOS defaults configured."
+
+###############################################################################
+# OpenClaw                                                                    #
+###############################################################################
+
+echo "Installing OpenClaw ..."
+curl -fsSL --proto '=https' --tlsv1.2 'https://openclaw.ai/install.sh' -o /tmp/openclaw-install.sh
+OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
+rm -f /tmp/openclaw-install.sh
+
+# Install and start the Gateway as a launchd service
+if command -v openclaw > /dev/null 2>&1; then
+  echo "Installing OpenClaw Gateway service ..."
+  openclaw gateway install
+  openclaw gateway start
+  echo "Gateway service installed and started."
+else
+  echo "Warning: openclaw not found on PATH after install."
+  echo "Open a new shell, then run:"
+  echo "  openclaw gateway install && openclaw gateway start"
+fi
+
+echo ""
+echo "============================================================"
+echo "OpenClaw is installed. To finish setup, run:"
+echo "  openclaw onboard"
+echo ""
+echo "This will configure your messaging channels and API keys."
+echo "============================================================"

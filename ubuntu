@@ -32,7 +32,7 @@ fi
 
 sudo apt update
 
-apt_packages="build-essential gcc libssl-dev zsh exuberant-ctags git htop gh jq gnupg2 openssl openssh-server silversearcher-ag shellcheck tmate tmux vim watch"
+apt_packages="build-essential gcc libssl-dev zsh universal-ctags git htop gh jq gnupg openssl openssh-server silversearcher-ag shellcheck tmate tmux vim watch"
 if [ -z "${LAPTOP_SKIP_DOCKER}" ]; then
   apt_packages="$apt_packages docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
 fi
