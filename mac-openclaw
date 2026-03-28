@@ -20,7 +20,7 @@ if ! command -v brew > /dev/null 2>&1; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
-echo "Updating Homebrew formulae ..."
+echo "Updating Homebrew ..."
 brew update --force
 
 brew bundle --file=- <<EOF
@@ -59,6 +59,9 @@ brew "forego"
 # Node.js v22 — required by OpenClaw
 brew "node@22"
 EOF
+
+echo "Upgrading installed packages ..."
+brew upgrade
 
 # Put node@22 on PATH for this session
 brew link node@22 --overwrite --force 2>/dev/null || true
@@ -125,7 +128,7 @@ echo "macOS defaults configured."
 # OpenClaw                                                                    #
 ###############################################################################
 
-echo "Installing OpenClaw ..."
+echo "Installing/updating OpenClaw ..."
 curl -fsSL --proto '=https' --tlsv1.2 'https://openclaw.ai/install.sh' -o /tmp/openclaw-install.sh
 OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
 rm -f /tmp/openclaw-install.sh
@@ -133,7 +136,8 @@ rm -f /tmp/openclaw-install.sh
 # Install and start the Gateway as a launchd service
 if command -v openclaw > /dev/null 2>&1; then
   echo "Installing OpenClaw Gateway service ..."
-  openclaw gateway install
+  openclaw gateway install 2>/dev/null || true
+  openclaw gateway stop 2>/dev/null || true
   openclaw gateway start
   echo "Gateway service installed and started."
 else
