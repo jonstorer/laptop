@@ -12,20 +12,10 @@ while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
-if [ "$(uname -m)" = "x86_64" ]; then
-  HOMEBREW_PREFIX="/usr/local"
-else
-  HOMEBREW_PREFIX="/opt/homebrew"
-  if ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
-    echo "Installing Rosetta ..."
-    sudo softwareupdate --install-rosetta --agree-to-license
-  fi
-fi
-
 if ! command -v brew > /dev/null 2>&1; then
   echo "Installing Homebrew ..."
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
-  eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
+  eval "$(/usr/local/bin/brew shellenv)"
 fi
 
 echo "Updating Homebrew formulae ..."
