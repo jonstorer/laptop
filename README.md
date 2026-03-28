@@ -12,10 +12,9 @@ Requirements
 
 Support For:
 
-* macOs Catalina 10.15
-* macOs Big Sur  11
-* macOs Monterey 12
-* Ubuntu 20.04
+* macOS (Apple Silicon) — `mac-agentic`, `mac-openclaw`
+* macOS (Intel x86_64) — `mac-x86_64`
+* Ubuntu 20.04+
 * Raspberry Pi (Ubuntu-based)
 * Windows 11
 
@@ -27,11 +26,28 @@ Install
 
 Download, review, then execute the script:
 
-#### Mac
+#### Mac — Agentic Dev (Apple Silicon)
+
+Human dev machine with AI workflows: Claude, Ollama, VS Code, Claude Code.
 
 ```sh
-curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac' | sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-agentic' | sh
 ```
+
+#### Mac — OpenClaw Agent (Apple Silicon)
+
+Sets up a Mac to run [OpenClaw](https://openclaw.ai) as a persistent autonomous agent. After the script completes, run `openclaw onboard`.
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-openclaw' | sh
+```
+
+#### Mac — Intel (x86_64)
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-x86_64' | sh
+```
+
 #### Ubuntu
 
 ```sh
@@ -75,44 +91,66 @@ If a script fails, copy the lines where it failed into a
 What it sets up
 ---------------
 
-#### Mac
+#### Mac — Agentic Dev (Apple Silicon)
 
-Uses [Homebrew](http://brew.sh/) for package management. Supports Intel (x86_64) and Apple Silicon (Rosetta installed if needed).
+Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
-**Casks:** alfred, docker-desktop, google-chrome, iterm2, licecap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, qlstephen
+**Casks:** alfred, docker-desktop, google-chrome, iterm2, kap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, qlstephen, claude, ollama, visual-studio-code
 
-**CLI tools:** gnupg, openssl, shellcheck, reattach-to-user-namespace, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
+**CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
 
-**Node.js:** asdf with asdf-nodejs plugin; installs current LTS and sets as global default. Supports `.nvmrc` and `.node-version` via `legacy_version_file` in `~/.asdfrc`.
+**Node.js:** asdf with asdf-nodejs plugin; installs current LTS and sets as global default.
 
-Sets zsh as the default shell.
+**AI tools:** Claude Code (`@anthropic-ai/claude-code`) installed globally via npm. VS Code extension `anthropic.claude-code` installed automatically.
+
+Sets zsh as the default shell and applies macOS defaults.
+
+#### Mac — OpenClaw Agent (Apple Silicon)
+
+Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
+
+**Casks:** alfred, docker-desktop, google-chrome, iterm2, rectangle, slack, textmate, ngrok
+
+**CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, node@22
+
+**OpenClaw:** installed via the official installer; Gateway service installed and started via launchd. Run `openclaw onboard` after the script completes.
+
+Time Machine is disabled by default. Set `OPENCLAW_KEEP_TIME_MACHINE=1` to skip.
+
+#### Mac — Intel (x86_64)
+
+Uses [Homebrew](http://brew.sh/) for package management. Intel x86_64 only.
+
+**Casks:** alfred, docker-desktop, google-chrome, iterm2, kap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, qlstephen
+
+**CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
+
+**Node.js:** asdf with asdf-nodejs plugin; installs current LTS and sets as global default.
+
+Sets zsh as the default shell and applies macOS defaults.
 
 #### Ubuntu
 
-For desktop machines (with display). Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, exuberant-ctags, git, htop, hub, jq, gnupg2, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. asdf with Node.js LTS (same as Mac). Sets zsh as the default shell.
+For desktop machines (with display). Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, universal-ctags, git, htop, gh, jq, gnupg, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. asdf with Node.js LTS. Sets zsh as the default shell.
 
 #### Raspberry Pi
 
-Same as Ubuntu plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 so you can access the Pi remotely.
+Same as Ubuntu plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 (persisted via netfilter-persistent) so you can access the Pi remotely.
 
 #### Windows (two steps)
 
 **Step 1** sets up [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) with Ubuntu, [Chocolatey](https://chocolatey.org/), and Windows apps: git, vscode, docker-desktop, googlechrome, slack, powershell. **Requires Administrator**; reboot if prompted.
 
-**Step 2** runs the Ubuntu script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1`—Docker Desktop provides Docker to WSL. After both steps you get the same environment as Mac/Ubuntu (asdf, Node.js LTS, zsh, tmux, etc.).
-
-It should take less than 15 minutes to install (depends on your machine).
+**Step 2** runs the Ubuntu script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1` — Docker Desktop provides Docker to WSL. After both steps you get the same environment as Mac/Ubuntu (asdf, Node.js LTS, zsh, tmux, etc.).
 
 Contributing
 ------------
 
-Edit the mac, ubuntu, pi, or windows file as appropriate.
-Document in the `README.md` file.
-Follow shell style guidelines by using [ShellCheck] and [Syntastic].
+Edit the relevant script file and document changes in `README.md`.
+Follow shell style guidelines using [ShellCheck].
 
 ```sh
 brew install shellcheck
 ```
 
 [ShellCheck]: http://www.shellcheck.net/about.html
-[Syntastic]: https://github.com/scrooloose/syntastic
