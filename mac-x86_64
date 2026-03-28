@@ -214,15 +214,6 @@ defaults write com.apple.DiskUtility advanced-image-options -bool true
 # DESTRUCTIVE - run only with OSX_DESTRUCTIVE=1                               #
 ###############################################################################
 
-if [ "$OSX_DESTRUCTIVE" = "1" ]; then
-  echo "Applying destructive macOS defaults ..."
-  defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
-  hash tmutil > /dev/null 2>&1 && sudo tmutil disable
-  echo "Destructive defaults applied."
-else
-  echo "Skipping destructive defaults. Set OSX_DESTRUCTIVE=1 to disable Time Machine, etc."
-fi
-
 ###############################################################################
 # Restart affected applications                                               #
 ###############################################################################
