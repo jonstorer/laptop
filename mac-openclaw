@@ -115,7 +115,9 @@ defaults write com.google.iterm2 QuitWhenAllWindowsClosed -bool true
 # Set OPENCLAW_KEEP_TIME_MACHINE=1 to skip
 if [ "${OPENCLAW_KEEP_TIME_MACHINE:-0}" != "1" ]; then
   defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
-  hash tmutil > /dev/null 2>&1 && sudo tmutil disable || true
+  if hash tmutil > /dev/null 2>&1; then
+    sudo tmutil disable
+  fi
 fi
 
 for app in "Dock" "Finder" "SystemUIServer"; do
