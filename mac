@@ -28,11 +28,6 @@ if ! command -v brew > /dev/null 2>&1; then
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
 
-if brew list | grep -Fq brew-cask; then
-  echo "Uninstalling old Homebrew-Cask ..."
-  brew uninstall --force brew-cask
-fi
-
 echo "Updating Homebrew formulae ..."
 brew update --force
 
@@ -41,7 +36,7 @@ cask "alfred"
 cask "docker-desktop"
 cask "google-chrome"
 cask "iterm2"
-cask "licecap"
+cask "kap"
 cask "postman"
 cask "rectangle"
 cask "slack"
@@ -243,10 +238,7 @@ fi
 ###############################################################################
 
 for app in "Calendar" "Contacts" "Dock" "Finder" \
-  "Mail" "Safari" "SystemUIServer"; do
-  killall "$app" > /dev/null 2>&1 || true
-done
-for app in "iTunes" "Music"; do
+  "Mail" "Music" "Safari" "SystemUIServer"; do
   killall "$app" > /dev/null 2>&1 || true
 done
 
