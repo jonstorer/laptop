@@ -61,6 +61,9 @@ if (-Not (Get-Command choco -ErrorAction SilentlyContinue)) {
   choco upgrade chocolatey -y
 }
 
+# Reload PATH so choco is available in the current session after a fresh install
+$env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+
 Write-Host "Installing Windows applications ..."
 
 choco upgrade -y `

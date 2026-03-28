@@ -69,11 +69,8 @@ The `LAPTOP_SKIP_DOCKER=1` skips Docker installation (Docker Desktop provides it
 Debugging
 ---------
 
-Your last Laptop run will be saved to `~/laptop.log`.
-Read through it to see if you can debug the issue yourself.
-If not, copy the lines where the script failed into a
-[new GitHub Issue](https://github.com/jonstorer/laptop/issues/new) for us.
-Or, attach the whole log file as an attachment.
+If a script fails, copy the lines where it failed into a
+[new GitHub Issue](https://github.com/jonstorer/laptop/issues/new).
 
 What it sets up
 ---------------
@@ -82,7 +79,7 @@ What it sets up
 
 Uses [Homebrew](http://brew.sh/) for package management. Supports Intel (x86_64) and Apple Silicon (Rosetta installed if needed).
 
-**Casks:** alfred, docker, vagrant, google-chrome, iterm2, licecap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, qlstephen
+**Casks:** alfred, docker-desktop, google-chrome, iterm2, licecap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, qlstephen
 
 **CLI tools:** gnupg, openssl, shellcheck, reattach-to-user-namespace, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
 
