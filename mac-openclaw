@@ -33,6 +33,9 @@ cask "rectangle"
 cask "slack"
 cask "textmate"
 
+# AI
+cask "ollama"
+
 # Tunneling — useful for exposing the gateway or webhooks
 cask "ngrok"
 
