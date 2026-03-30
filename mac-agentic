@@ -32,7 +32,6 @@ cask "postman"
 cask "rectangle"
 cask "slack"
 cask "spotify"
-cask "macdown"
 cask "textmate"
 
 cask "karabiner-elements"
