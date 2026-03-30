@@ -126,9 +126,9 @@ defaults write NSGlobalDomain AppleEnableSwipeNavigateWithScrolls -bool true
 defaults -currentHost write NSGlobalDomain com.apple.trackpad.threeFingerHorizSwipeGesture -int 1
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadThreeFingerHorizSwipeGesture -int 1
 defaults write NSGlobalDomain AppleKeyboardUIMode -int 3
-defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true
-defaults write com.apple.universalaccess HIDScrollZoomModifierMask -int 262144
-defaults write com.apple.universalaccess closeViewZoomFollowsFocus -bool true
+sudo defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true
+sudo defaults write com.apple.universalaccess HIDScrollZoomModifierMask -int 262144
+sudo defaults write com.apple.universalaccess closeViewZoomFollowsFocus -bool true
 defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
 defaults write NSGlobalDomain KeyRepeat -int 1
 
@@ -230,7 +230,7 @@ defaults write com.apple.DiskUtility advanced-image-options -bool true
 
 if [ "$OSX_DESTRUCTIVE" = "1" ]; then
   echo "Applying destructive macOS defaults ..."
-  defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
+  sudo defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
   hash tmutil > /dev/null 2>&1 && sudo tmutil disable
   echo "Destructive defaults applied."
 else
