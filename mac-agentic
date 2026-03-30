@@ -69,12 +69,6 @@ if [ -f "$(brew --prefix asdf 2>/dev/null)/libexec/asdf.sh" ]; then
   . "$(brew --prefix asdf)/libexec/asdf.sh"
 
   asdf plugin add nodejs 2>/dev/null || true
-
-  # Enable legacy version file support so asdf respects .nvmrc and .node-version
-  if ! grep -q "legacy_version_file" "$HOME/.asdfrc" 2>/dev/null; then
-    echo "legacy_version_file = yes" >> "$HOME/.asdfrc"
-  fi
-
   asdf install nodejs lts 2>/dev/null || true
   node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
   if [ -n "$node_version" ]; then
