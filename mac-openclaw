@@ -34,7 +34,7 @@ cask "slack"
 cask "textmate"
 
 # AI
-cask "ollama"
+cask "ollama-app"
 
 # Tunneling — useful for exposing the gateway or webhooks
 cask "ngrok"

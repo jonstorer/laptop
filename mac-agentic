@@ -40,7 +40,7 @@ cask "qlstephen"
 
 # AI tooling
 cask "claude"
-cask "ollama"
+cask "ollama-app"
 cask "visual-studio-code"
 
 # Libraries & Tools
