@@ -64,6 +64,10 @@ wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ub
 Sets up Ubuntu to run OpenClaw as a persistent autonomous agent with a local LLM via llama.cpp.
 
 ```sh
+wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu-openclaw' | sh
+```
+or
+```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu-openclaw' | sh
 ```
 

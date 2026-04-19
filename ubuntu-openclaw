@@ -16,11 +16,11 @@ set -e
 sudo apt update
 sudo apt full-upgrade
 
-sudo apt-get install -y ca-certificates curl gnupg
+sudo apt-get install -y ca-certificates gnupg wget
 
 if [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
   sudo install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  wget -qO- https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 # shellcheck disable=SC1091
@@ -32,7 +32,7 @@ fi
 
 sudo apt update
 
-apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck openssh-server wget xrdp docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck openssh-server xrdp docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
 # shellcheck disable=SC2086
 sudo apt install -y $apt_packages
 
@@ -41,7 +41,7 @@ sudo usermod -aG docker "$USER"
 # Node.js v22 via NodeSource
 if ! node --version 2>/dev/null | grep -q '^v22\.'; then
   echo "Installing Node.js v22 ..."
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+  wget -qO- https://deb.nodesource.com/setup_22.x | sudo -E bash -
   sudo apt install -y nodejs
 fi
 
@@ -77,7 +77,7 @@ sudo systemctl restart xrdp
 
 if ! command -v tailscale > /dev/null 2>&1; then
   echo "Installing Tailscale ..."
-  curl -fsSL https://tailscale.com/install.sh | sh
+  wget -qO- https://tailscale.com/install.sh | sh
 fi
 sudo systemctl enable tailscaled
 sudo systemctl start tailscaled
@@ -219,7 +219,7 @@ sudo chsh -s "$shell_path" "$USER"
 ###############################################################################
 
 echo "Installing/updating OpenClaw ..."
-curl -fsSL --proto '=https' --tlsv1.2 'https://openclaw.ai/install.sh' -o /tmp/openclaw-install.sh
+wget -q -O /tmp/openclaw-install.sh 'https://openclaw.ai/install.sh'
 OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
 rm -f /tmp/openclaw-install.sh
 

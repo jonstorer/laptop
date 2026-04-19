@@ -15,12 +15,12 @@ set -e
 sudo apt update
 sudo apt full-upgrade
 
-sudo apt-get install -y ca-certificates curl gnupg
+sudo apt-get install -y ca-certificates gnupg wget
 
 # Skip Docker setup when LAPTOP_SKIP_DOCKER=1 (e.g. WSL with Docker Desktop)
 if [ -z "${LAPTOP_SKIP_DOCKER}" ] && [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
   sudo install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  wget -qO- https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 # shellcheck disable=SC1091
