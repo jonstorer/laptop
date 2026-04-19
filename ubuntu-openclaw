@@ -68,6 +68,10 @@ sudo adduser xrdp ssl-cert 2>/dev/null || true
 echo "gnome-session" | sudo tee /etc/skel/.xsession > /dev/null
 echo "gnome-session" > "$HOME/.xsession"
 
+# Ubuntu 24.04 xrdp defaults to dual-stack binding which fails with errno=98/22.
+# Force IPv4-only to avoid the conflict.
+sudo sed -i 's/^port=3389$/port=tcp4:3389/' /etc/xrdp/xrdp.ini
+
 sudo systemctl enable xrdp
 sudo systemctl restart xrdp
 
