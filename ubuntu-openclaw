@@ -1,0 +1,253 @@
+#!/bin/sh
+
+# Welcome to the ubuntu-openclaw machine script!
+# Sets up Ubuntu x86_64 to run OpenClaw as a persistent autonomous agent.
+
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
+
+# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
+
+# shellcheck disable=SC2154
+trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+set -e
+
+sudo apt update
+sudo apt full-upgrade
+
+sudo apt-get install -y ca-certificates curl gnupg
+
+if [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+# shellcheck disable=SC1091
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+fi
+
+sudo apt update
+
+apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck openssh-server wget xrdp docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+# shellcheck disable=SC2086
+sudo apt install -y $apt_packages
+
+sudo usermod -aG docker "$USER"
+
+# Node.js v22 via NodeSource
+if ! node --version 2>/dev/null | grep -q '^v22\.'; then
+  echo "Installing Node.js v22 ..."
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+  sudo apt install -y nodejs
+fi
+
+# SSH
+sudo systemctl enable ssh
+sudo systemctl start ssh
+
+###############################################################################
+# xrdp - remote desktop                                                       #
+###############################################################################
+
+# Disable Wayland in GDM3 to force X11 (required for xrdp on Ubuntu 24.04)
+gdm_conf="/etc/gdm3/custom.conf"
+if [ -f "$gdm_conf" ]; then
+  if grep -q "^#WaylandEnable=false" "$gdm_conf"; then
+    sudo sed -i 's/^#WaylandEnable=false/WaylandEnable=false/' "$gdm_conf"
+  elif ! grep -q "^WaylandEnable=false" "$gdm_conf"; then
+    sudo sed -i '/^\[daemon\]/a WaylandEnable=false' "$gdm_conf"
+  fi
+fi
+
+sudo adduser xrdp ssl-cert 2>/dev/null || true
+
+echo "gnome-session" | sudo tee /etc/skel/.xsession > /dev/null
+echo "gnome-session" > "$HOME/.xsession"
+
+sudo systemctl enable xrdp
+sudo systemctl restart xrdp
+
+###############################################################################
+# Tailscale                                                                   #
+###############################################################################
+
+if ! command -v tailscale > /dev/null 2>&1; then
+  echo "Installing Tailscale ..."
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
+sudo systemctl enable tailscaled
+sudo systemctl start tailscaled
+
+###############################################################################
+# llama.cpp                                                                   #
+###############################################################################
+
+sudo mkdir -p /opt/openclaw/llama.cpp
+sudo chown -R "$USER":"$USER" /opt/openclaw
+
+if [ ! -d "/opt/openclaw/llama.cpp/.git" ]; then
+  git clone https://github.com/ggerganov/llama.cpp.git /opt/openclaw/llama.cpp
+else
+  git -C /opt/openclaw/llama.cpp pull
+fi
+
+if [ ! -f "/opt/openclaw/llama.cpp/build/bin/llama-server" ]; then
+  echo "Building llama.cpp ..."
+  cmake -B /opt/openclaw/llama.cpp/build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DGGML_AVX2=ON \
+    -DGGML_F16C=ON \
+    -DGGML_FMA=ON \
+    -DGGML_CUDA=OFF \
+    -DLLAMA_BUILD_SERVER=ON \
+    /opt/openclaw/llama.cpp
+  cmake --build /opt/openclaw/llama.cpp/build --config Release -j "$(nproc)"
+fi
+
+###############################################################################
+# Model download                                                              #
+###############################################################################
+
+OPENCLAW_MODEL_FILE="${OPENCLAW_MODEL_FILE:-Mistral-Small-3.1-24B-Instruct-2503-Q4_K_M.gguf}"
+OPENCLAW_MODEL_URL="${OPENCLAW_MODEL_URL:-https://huggingface.co/bartowski/Mistral-Small-3.1-24B-Instruct-2503-GGUF/resolve/main/$OPENCLAW_MODEL_FILE}"
+
+sudo mkdir -p /opt/openclaw/models
+sudo chown -R "$USER":"$USER" /opt/openclaw
+
+# Remove any stale partial download from a previous interrupted run
+rm -f "/opt/openclaw/models/$OPENCLAW_MODEL_FILE.tmp"
+
+if [ ! -f "/opt/openclaw/models/$OPENCLAW_MODEL_FILE" ]; then
+  echo "Downloading model $OPENCLAW_MODEL_FILE ..."
+  wget --progress=bar:force:noscroll \
+    -O "/opt/openclaw/models/$OPENCLAW_MODEL_FILE.tmp" \
+    "$OPENCLAW_MODEL_URL"
+  mv "/opt/openclaw/models/$OPENCLAW_MODEL_FILE.tmp" \
+     "/opt/openclaw/models/$OPENCLAW_MODEL_FILE"
+else
+  echo "Model $OPENCLAW_MODEL_FILE already exists, skipping download."
+fi
+
+###############################################################################
+# llama-server systemd service                                                #
+###############################################################################
+
+LLAMA_MODEL_PATH="/opt/openclaw/models/$OPENCLAW_MODEL_FILE"
+LLAMA_SERVICE_USER="$USER"
+
+# Physical core count: "Core(s) per socket" * "Socket(s)" (excludes hyperthreads)
+LLAMA_THREADS=$(( \
+  $(lscpu | awk '/^Core\(s\) per socket:/ {print $NF}') * \
+  $(lscpu | awk '/^Socket\(s\):/ {print $NF}') \
+))
+
+# Total RAM in GB (MemTotal from /proc/meminfo is in kB)
+total_ram_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+total_ram_gb=$(( total_ram_kb / 1024 / 1024 ))
+
+# Parallel slots: floor(RAM_GB / 8), clamped to [1, 8]
+LLAMA_PARALLEL=$(( total_ram_gb / 8 ))
+if [ "$LLAMA_PARALLEL" -lt 1 ]; then LLAMA_PARALLEL=1; fi
+if [ "$LLAMA_PARALLEL" -gt 8 ]; then LLAMA_PARALLEL=8; fi
+
+# Context size based on RAM tier
+if [ "$total_ram_gb" -le 16 ]; then
+  LLAMA_CTX_SIZE=4096
+elif [ "$total_ram_gb" -le 32 ]; then
+  LLAMA_CTX_SIZE=8192
+elif [ "$total_ram_gb" -le 64 ]; then
+  LLAMA_CTX_SIZE=16384
+else
+  LLAMA_CTX_SIZE=32768
+fi
+
+# mlock: only if RAM >= model_size * 1.25 (keeps the model pinned in RAM, no swap)
+# The atomic tmp→final move above guarantees this path is always a complete file.
+model_size_bytes=$(du -b "$LLAMA_MODEL_PATH" | awk '{print $1}')
+# Ceil-divide bytes -> GB so we don't underestimate the model's footprint
+model_size_gb=$(( (model_size_bytes + 1073741823) / 1073741824 ))
+mlock_threshold_gb=$(( model_size_gb * 5 / 4 ))
+if [ "$total_ram_gb" -ge "$mlock_threshold_gb" ]; then
+  LLAMA_MLOCK="--mlock"
+else
+  LLAMA_MLOCK=""
+fi
+
+# Build the ExecStart line; append --mlock only when RAM is sufficient
+LLAMA_EXECSTART="/opt/openclaw/llama.cpp/build/bin/llama-server --host 127.0.0.1 --port 8080 --model $LLAMA_MODEL_PATH --ctx-size $LLAMA_CTX_SIZE --threads $LLAMA_THREADS --parallel $LLAMA_PARALLEL --flash-attn"
+if [ -n "$LLAMA_MLOCK" ]; then
+  LLAMA_EXECSTART="$LLAMA_EXECSTART $LLAMA_MLOCK"
+fi
+
+sudo tee /etc/systemd/system/llama-server.service > /dev/null <<EOF
+[Unit]
+Description=llama-server OpenAI-compatible inference server
+After=network.target
+
+[Service]
+Type=simple
+User=$LLAMA_SERVICE_USER
+ExecStart=$LLAMA_EXECSTART
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable llama-server
+sudo systemctl start llama-server
+
+###############################################################################
+# zsh                                                                         #
+###############################################################################
+
+shell_path="$(command -v zsh)"
+echo "Ensure shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+  echo "Add '$shell_path' to /etc/shells"
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+sudo chsh -s "$shell_path" "$USER"
+
+###############################################################################
+# OpenClaw                                                                    #
+###############################################################################
+
+echo "Installing/updating OpenClaw ..."
+curl -fsSL --proto '=https' --tlsv1.2 'https://openclaw.ai/install.sh' -o /tmp/openclaw-install.sh
+OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
+rm -f /tmp/openclaw-install.sh
+
+echo ""
+echo "OpenClaw is installed. Run 'openclaw onboard' to configure when ready."
+
+###############################################################################
+# Summary                                                                     #
+###############################################################################
+
+LOCAL_IP="$(hostname -I | awk '{print $1}')"
+
+echo ""
+echo "============================================================"
+echo "Setup complete."
+echo ""
+echo "Local IP:     $LOCAL_IP"
+echo "SSH:          ssh $USER@$LOCAL_IP"
+echo "RDP:          $LOCAL_IP:3389  (Microsoft Remote Desktop, port 3389)"
+echo "llama-server: http://127.0.0.1:8080/v1"
+echo ""
+echo "llama-server config (derived from hardware):"
+echo "  --threads  $LLAMA_THREADS  (physical cores)"
+echo "  --parallel $LLAMA_PARALLEL  (slots; RAM: ${total_ram_gb}GB)"
+echo "  --ctx-size $LLAMA_CTX_SIZE"
+echo "  mlock:     ${LLAMA_MLOCK:-disabled}  (model: ${model_size_gb}GB, threshold: ${mlock_threshold_gb}GB)"
+echo ""
+echo "Next steps:"
+echo "  1. tailscale up       (authenticate Tailscale for internet access)"
+echo "  2. openclaw onboard   (configure OpenClaw when ready)"
+echo "============================================================"

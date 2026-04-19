@@ -14,7 +14,8 @@ Support For:
 
 * macOS (Apple Silicon) — `mac-agentic`, `mac-openclaw`
 * macOS (Intel x86_64) — `mac-x86_64`
-* Ubuntu 20.04+
+* Ubuntu 20.04+ — `ubuntu`
+* Ubuntu 24.04 x86_64 — `ubuntu-openclaw`
 * Raspberry Pi (Ubuntu-based)
 * Windows 11
 
@@ -56,6 +57,14 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 or
 ```sh
 wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
+```
+
+#### Ubuntu — OpenClaw Agent
+
+Sets up Ubuntu to run OpenClaw as a persistent autonomous agent with a local LLM via llama.cpp.
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu-openclaw' | sh
 ```
 
 #### Raspberry Pi
@@ -109,13 +118,11 @@ Sets zsh as the default shell and applies macOS defaults.
 
 Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
-**Casks:** alfred, docker-desktop, google-chrome, iterm2, rectangle, slack, textmate, ngrok
+**Casks:** alfred, docker-desktop, google-chrome, iterm2, rectangle, slack, textmate, ngrok, ollama-app
 
 **CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, node@22
 
-**OpenClaw:** installed via the official installer; Gateway service installed and started via launchd. Run `openclaw onboard` after the script completes.
-
-Time Machine is disabled by default. Set `OPENCLAW_KEEP_TIME_MACHINE=1` to skip.
+**OpenClaw:** installed via the official installer. Run `openclaw onboard` to configure.
 
 #### Mac — Intel (x86_64)
 
@@ -132,6 +139,24 @@ Sets zsh as the default shell and applies macOS defaults.
 #### Ubuntu
 
 For desktop machines (with display). Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, universal-ctags, git, htop, gh, jq, gnupg, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. asdf with Node.js LTS. Sets zsh as the default shell.
+
+#### Ubuntu — OpenClaw Agent
+
+**Remote access:** SSH, xrdp (port 3389), Tailscale
+
+**Inference:** llama.cpp built from source with AVX2/F16C/FMA, no CUDA; OpenAI-compatible API on port 8080
+
+**Model:** Mistral-Small-3.1 24B Q4_K_M downloaded during install; override with `OPENCLAW_MODEL_FILE` and `OPENCLAW_MODEL_URL`
+
+**OpenClaw:** binary installed; run `openclaw onboard` to configure
+
+**Node.js:** v22 via NodeSource
+
+**Docker:** CE
+
+**Shell:** zsh
+
+Run `tailscale up` after install to authenticate Tailscale for internet access. Run `openclaw onboard` to configure OpenClaw.
 
 #### Raspberry Pi
 

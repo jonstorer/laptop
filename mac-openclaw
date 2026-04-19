@@ -133,19 +133,6 @@ curl -fsSL --proto '=https' --tlsv1.2 'https://openclaw.ai/install.sh' -o /tmp/o
 OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
 rm -f /tmp/openclaw-install.sh
 
-# Install and start the Gateway as a launchd service
-if command -v openclaw > /dev/null 2>&1; then
-  echo "Installing OpenClaw Gateway service ..."
-  openclaw gateway install 2>/dev/null || true
-  openclaw gateway stop 2>/dev/null || true
-  openclaw gateway start
-  echo "Gateway service installed and started."
-else
-  echo "Warning: openclaw not found on PATH after install."
-  echo "Open a new shell, then run:"
-  echo "  openclaw gateway install && openclaw gateway start"
-fi
-
 echo ""
 echo "============================================================"
 echo "OpenClaw is installed. To finish setup, run:"
