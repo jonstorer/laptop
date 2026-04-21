@@ -122,7 +122,7 @@ if [ -z "$HF_TOKEN" ]; then
   echo "  1. Create an account at https://huggingface.co if you don't have one."
   echo "  2. Accept the model license at: https://huggingface.co/bartowski/Mistral-Small-3.1-24B-Instruct-2503-GGUF"
   echo "  3. Create a read-only token at: https://huggingface.co/settings/tokens"
-  read -r -p "Paste your HuggingFace token and press Enter: " HF_TOKEN
+  read -r -p "Paste your HuggingFace token and press Enter: " HF_TOKEN || true
 fi
 
 if [ ! -f "/opt/openclaw/models/$OPENCLAW_MODEL_FILE" ]; then
