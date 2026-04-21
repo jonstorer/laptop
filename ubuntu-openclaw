@@ -32,7 +32,7 @@ fi
 
 sudo apt update
 
-apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck openssh-server ubuntu-desktop-minimal xrdp docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck openssh-server ubuntu-desktop-minimal docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
 # shellcheck disable=SC2086
 sudo apt install -y $apt_packages
 
@@ -50,30 +50,11 @@ sudo systemctl enable ssh
 sudo systemctl start ssh
 
 ###############################################################################
-# xrdp - remote desktop                                                       #
+# gnome-remote-desktop - remote desktop                                       #
 ###############################################################################
 
-# Disable Wayland in GDM3 to force X11 (required for xrdp on Ubuntu 24.04)
-gdm_conf="/etc/gdm3/custom.conf"
-if [ -f "$gdm_conf" ]; then
-  if grep -q "^#WaylandEnable=false" "$gdm_conf"; then
-    sudo sed -i 's/^#WaylandEnable=false/WaylandEnable=false/' "$gdm_conf"
-  elif ! grep -q "^WaylandEnable=false" "$gdm_conf"; then
-    sudo sed -i '/^\[daemon\]/a WaylandEnable=false' "$gdm_conf"
-  fi
-fi
-
-sudo adduser xrdp ssl-cert 2>/dev/null || true
-
-echo "gnome-session" | sudo tee /etc/skel/.xsession > /dev/null
-echo "gnome-session" > "$HOME/.xsession"
-
-sudo systemctl enable xrdp
-# Stop any running instance first so the port is free before we start fresh.
-# apt may have auto-started xrdp on install; restart alone races on socket release.
-sudo systemctl stop xrdp 2>/dev/null || true
-sleep 2
-sudo systemctl start xrdp
+sudo systemctl enable gnome-remote-desktop.service 2>/dev/null || true
+sudo systemctl start gnome-remote-desktop.service 2>/dev/null || true
 
 ###############################################################################
 # Tailscale                                                                   #
@@ -242,7 +223,7 @@ echo "Setup complete."
 echo ""
 echo "Local IP:     $LOCAL_IP"
 echo "SSH:          ssh $USER@$LOCAL_IP"
-echo "RDP:          $LOCAL_IP:3389  (Microsoft Remote Desktop, port 3389)"
+echo "RDP:          $LOCAL_IP:3389  (Microsoft Remote Desktop — gnome-remote-desktop)"
 echo "llama-server: http://127.0.0.1:8080/v1"
 echo ""
 echo "llama-server config (derived from hardware):"
@@ -255,3 +236,9 @@ echo "Next steps:"
 echo "  1. tailscale up       (authenticate Tailscale for internet access)"
 echo "  2. openclaw onboard   (configure OpenClaw when ready)"
 echo "============================================================"
+
+echo ""
+echo "NOTE: To finish RDP setup, run:"
+echo "  grdctl rdp enable"
+echo "  grdctl rdp set-credentials <username> <password>"
+echo "  grdctl rdp disable-view-only"
