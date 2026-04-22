@@ -219,13 +219,19 @@ sudo chsh -s "$shell_path" "$USER"
 # OpenClaw                                                                    #
 ###############################################################################
 
-echo "Installing/updating OpenClaw ..."
-wget -q -O /tmp/openclaw-install.sh 'https://openclaw.ai/install.sh'
-OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
-rm -f /tmp/openclaw-install.sh
+OPENCLAW_LATEST=$(npm view openclaw version 2>/dev/null || true)
+OPENCLAW_INSTALLED=$(openclaw --version 2>/dev/null | awk '{print $2}' || true)
 
-echo ""
-echo "OpenClaw is installed. Run 'openclaw onboard' to configure when ready."
+if [ "$OPENCLAW_INSTALLED" = "$OPENCLAW_LATEST" ]; then
+  echo "OpenClaw $OPENCLAW_INSTALLED is already up to date, skipping."
+else
+  echo "Installing/updating OpenClaw ($OPENCLAW_INSTALLED -> $OPENCLAW_LATEST) ..."
+  wget -q -O /tmp/openclaw-install.sh 'https://openclaw.ai/install.sh'
+  OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
+  rm -f /tmp/openclaw-install.sh
+  echo ""
+  echo "OpenClaw is installed. Run 'openclaw onboard' to configure when ready."
+fi
 
 ###############################################################################
 # Summary                                                                     #
