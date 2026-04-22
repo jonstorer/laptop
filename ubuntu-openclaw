@@ -187,7 +187,7 @@ ExecStart=/opt/openclaw/llama.cpp/build/bin/llama-server \
   --ctx-size ${LLAMA_CTX_SIZE} \
   --threads ${LLAMA_THREADS} \
   --parallel ${LLAMA_PARALLEL} \
-  --flash-attn
+  --flash-attn on
 Restart=on-failure
 
 [Install]
