@@ -83,6 +83,7 @@ mkdir -p "$NPM_GLOBAL"
 npm config set prefix "$NPM_GLOBAL"
 export PATH="$NPM_GLOBAL/bin:$PATH"
 if ! grep -q 'NPM_GLOBAL' "$HOME/.zshrc" 2>/dev/null; then
+  # shellcheck disable=SC2016
   printf '\nexport NPM_GLOBAL="$HOME/.npm-global"\nexport PATH="$NPM_GLOBAL/bin:$PATH"\n' >> "$HOME/.zshrc"
 fi
 
