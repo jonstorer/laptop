@@ -55,6 +55,9 @@ if ! node --version 2>/dev/null | grep -q '^v22\.'; then
   sudo apt install -y nodejs
 fi
 
+# Claude Code
+npm install -g @anthropic-ai/claude-code
+
 # SSH
 sudo systemctl enable ssh
 sudo systemctl start ssh
