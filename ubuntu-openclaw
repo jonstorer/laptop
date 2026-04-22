@@ -158,8 +158,18 @@ LLAMA_THREADS=$(( \
 total_ram_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
 total_ram_gb=$(( total_ram_kb / 1024 / 1024 ))
 
-# Parallel slots: floor(RAM_GB / 8), clamped to [1, 8]
-LLAMA_PARALLEL=$(( total_ram_gb / 8 ))
+# Model size via Content-Length header (follow redirects)
+HF_MODEL_URL="https://huggingface.co/${HF_REPO}/resolve/main/${HF_BASE_MODEL}-${HF_QUANT}.gguf"
+MODEL_SIZE_BYTES=$(curl -sIL "$HF_MODEL_URL" | awk '/^[Cc]ontent-[Ll]ength:/ {val=$2} END {print val+0}')
+MODEL_SIZE_GB=$(( (MODEL_SIZE_BYTES + 1073741823) / 1073741824 ))
+if [ "$MODEL_SIZE_BYTES" -eq 0 ]; then
+  echo "WARNING: Could not determine model size, falling back to 14GB estimate."
+  MODEL_SIZE_GB=14
+fi
+
+# Parallel slots: floor((RAM - model) / 2), clamped to [1, 8]
+AVAILABLE_RAM_GB=$(( total_ram_gb - MODEL_SIZE_GB ))
+LLAMA_PARALLEL=$(( AVAILABLE_RAM_GB / 2 ))
 if [ "$LLAMA_PARALLEL" -lt 1 ]; then LLAMA_PARALLEL=1; fi
 if [ "$LLAMA_PARALLEL" -gt 8 ]; then LLAMA_PARALLEL=8; fi
 
@@ -173,8 +183,6 @@ elif [ "$total_ram_gb" -le 64 ]; then
 else
   LLAMA_CTX_SIZE=32768
 fi
-
-HF_MODEL_URL="https://huggingface.co/${HF_REPO}/resolve/main/${HF_BASE_MODEL}-${HF_QUANT}.gguf"
 
 sudo tee /etc/systemd/system/llama-server.service > /dev/null <<EOF
 [Unit]
@@ -249,10 +257,10 @@ echo "llama-server: http://127.0.0.1:8080/v1"
 echo ""
 echo "llama-server config (derived from hardware):"
 echo "  --threads  $LLAMA_THREADS  (physical cores)"
-echo "  --parallel $LLAMA_PARALLEL  (slots; RAM: ${total_ram_gb}GB)"
+echo "  --parallel $LLAMA_PARALLEL  (slots)"
 echo "  --ctx-size $LLAMA_CTX_SIZE"
-echo "  --hf-repo  $HF_REPO"
-echo "  --hf-file  ${HF_BASE_MODEL}-${HF_QUANT}.gguf"
+echo "  model:     ${HF_BASE_MODEL}-${HF_QUANT}.gguf (${MODEL_SIZE_GB}GB)"
+echo "  available: ${AVAILABLE_RAM_GB}GB for KV cache  (RAM: ${total_ram_gb}GB)"
 echo ""
 echo "Next steps:"
 echo "  1. Open a new terminal  (so PATH changes from this script take effect)"
