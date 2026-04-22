@@ -72,11 +72,13 @@ sudo systemctl enable ssh
 sudo systemctl start ssh
 
 ###############################################################################
-# gnome-remote-desktop - remote desktop                                       #
+# xrdp - remote desktop                                                       #
 ###############################################################################
 
-sudo systemctl enable gnome-remote-desktop.service 2>/dev/null || true
-sudo systemctl start gnome-remote-desktop.service 2>/dev/null || true
+sudo apt install -y xrdp
+sudo adduser xrdp ssl-cert
+sudo systemctl enable xrdp
+sudo systemctl start xrdp
 
 ###############################################################################
 # Tailscale                                                                   #
@@ -252,7 +254,7 @@ echo "Setup complete."
 echo ""
 echo "Local IP:     $LOCAL_IP"
 echo "SSH:          ssh $USER@$LOCAL_IP"
-echo "RDP:          $LOCAL_IP:3389  (Microsoft Remote Desktop — gnome-remote-desktop)"
+echo "RDP:          $LOCAL_IP:3389  (Microsoft Remote Desktop — xrdp, login with system credentials)"
 echo "llama-server: http://127.0.0.1:8080/v1"
 echo ""
 echo "llama-server config (derived from hardware):"
@@ -268,8 +270,3 @@ echo "  2. tailscale up         (authenticate Tailscale for internet access)"
 echo "  3. openclaw onboard     (configure OpenClaw when ready)"
 echo "============================================================"
 
-echo ""
-echo "NOTE: To finish RDP setup, run:"
-echo "  grdctl rdp enable"
-echo "  grdctl rdp set-credentials <username> <password>"
-echo "  grdctl rdp disable-view-only"
