@@ -13,6 +13,28 @@ while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
+###############################################################################
+# Cleanup — remove packages not needed for headless autonomous operation      #
+###############################################################################
+
+sudo apt remove --purge -y \
+  ubuntu-desktop-minimal \
+  gnome-remote-desktop \
+  gdm3 \
+  lightdm \
+  xrdp \
+  xorgxrdp \
+  2>/dev/null || true
+
+sudo apt autoremove --purge -y
+
+# Remove snap Chromium if present — OpenClaw requires the deb version
+if snap list chromium 2>/dev/null | grep -q chromium; then
+  sudo snap remove chromium
+fi
+
+rm -f "$HOME/.xsession"
+
 # Wait for apt locks to be released
 wait_for_apt() {
   echo "Waiting for apt lock..."
@@ -41,7 +63,7 @@ fi
 wait_for_apt
 sudo apt update
 
-apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck curl openssh-server ubuntu-desktop-minimal xclip docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck curl openssh-server xclip docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
 # shellcheck disable=SC2086
 sudo apt install -y $apt_packages
 
@@ -70,15 +92,6 @@ npm install -g @anthropic-ai/claude-code
 # SSH
 sudo systemctl enable ssh
 sudo systemctl start ssh
-
-###############################################################################
-# xrdp - remote desktop                                                       #
-###############################################################################
-
-sudo apt install -y xrdp
-sudo adduser xrdp ssl-cert
-sudo systemctl enable xrdp
-sudo systemctl start xrdp
 
 ###############################################################################
 # Tailscale                                                                   #
@@ -243,6 +256,39 @@ else
 fi
 
 ###############################################################################
+# OpenClaw browser config — headless Chromium via Playwright                 #
+###############################################################################
+
+# Install deb Chromium explicitly — NOT chromium-browser which is a snap
+# wrapper on Ubuntu 24.04 and breaks OpenClaw's ability to control it
+sudo apt install -y --no-install-recommends chromium
+
+mkdir -p "$HOME/.openclaw"
+
+OCJSON="$HOME/.openclaw/openclaw.json"
+
+if [ -f "$OCJSON" ]; then
+  tmp=$(mktemp)
+  jq '.browser = {
+    "enabled": true,
+    "defaultProfile": "openclaw",
+    "headless": true,
+    "noSandbox": true
+  }' "$OCJSON" > "$tmp" && mv "$tmp" "$OCJSON"
+else
+  cat > "$OCJSON" <<EOF
+{
+  "browser": {
+    "enabled": true,
+    "defaultProfile": "openclaw",
+    "headless": true,
+    "noSandbox": true
+  }
+}
+EOF
+fi
+
+###############################################################################
 # Summary                                                                     #
 ###############################################################################
 
@@ -254,7 +300,7 @@ echo "Setup complete."
 echo ""
 echo "Local IP:     $LOCAL_IP"
 echo "SSH:          ssh $USER@$LOCAL_IP"
-echo "RDP:          $LOCAL_IP:3389  (Microsoft Remote Desktop — xrdp, login with system credentials)"
+echo "Browser:      headless Chromium via Playwright (openclaw profile, noSandbox)"
 echo "llama-server: http://127.0.0.1:8080/v1"
 echo ""
 echo "llama-server config (derived from hardware):"
