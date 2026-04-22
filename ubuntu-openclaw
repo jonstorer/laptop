@@ -117,73 +117,32 @@ if [ ! -f "/opt/openclaw/llama.cpp/build/bin/llama-server" ]; then
 fi
 
 ###############################################################################
-# Model download                                                              #
+# llama-server systemd service (model downloaded via -hf on first start)     #
 ###############################################################################
 
 HF_AUTHOR="${HF_AUTHOR:-bartowski}"
 HF_BASE_MODEL="${HF_BASE_MODEL:-mistralai_Mistral-Small-3.2-24B-Instruct-2506}"
-HF_REPO="${HF_REPO:-${HF_AUTHOR}/${HF_BASE_MODEL}-GGUF}"
 HF_QUANT="${HF_QUANT:-Q4_K_M}"
-OPENCLAW_MODELS_DIR="/opt/openclaw/models"
+HF_REPO="${HF_REPO:-${HF_AUTHOR}/${HF_BASE_MODEL}-GGUF}"
 
-sudo mkdir -p "$OPENCLAW_MODELS_DIR"
-sudo chown -R "$USER":"$USER" /opt/openclaw
-
-echo "Resolving model file from https://huggingface.co/${HF_REPO} ..."
-OPENCLAW_MODEL_FILE=$(wget -qO- "https://huggingface.co/api/models/${HF_REPO}" | \
-  python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-files = [s['rfilename'] for s in data.get('siblings', [])
-         if s['rfilename'].endswith('.gguf')
-         and '${HF_QUANT}' in s['rfilename']
-         and 'mmproj' not in s['rfilename']
-         and 'imatrix' not in s['rfilename']]
-files.sort()
-if not files:
-    print('ERROR: no matching .gguf file found in ${HF_REPO}', file=sys.stderr)
-    print('Browse available files at: https://huggingface.co/${HF_REPO}', file=sys.stderr)
-    sys.exit(1)
-print(files[0])
-")
-OPENCLAW_MODEL_PATH="$OPENCLAW_MODELS_DIR/$OPENCLAW_MODEL_FILE"
-
-# Remove any stale partial download from a previous interrupted run
-rm -f "${OPENCLAW_MODEL_PATH}.tmp"
-
-if [ ! -f "$OPENCLAW_MODEL_PATH" ]; then
-  if [ -z "$HF_TOKEN" ]; then
-    echo ""
-    echo "A HuggingFace account and token are required to download this model."
-    echo "  1. Create an account at https://huggingface.co if you don't have one."
-    echo "  2. Accept the model license at: https://huggingface.co/${HF_REPO}"
-    echo "  3. Create a read-only token at: https://huggingface.co/settings/tokens"
-    echo ""
-    printf "Paste your HuggingFace token and press Enter: "
-    read -r HF_TOKEN < /dev/tty
-  fi
-
-  if [ -z "$HF_TOKEN" ]; then
-    echo "No token provided. Skipping model download."
-    echo "Re-run with: HF_TOKEN=hf_yourtoken $0"
-  else
-    echo "Downloading model $OPENCLAW_MODEL_FILE ..."
-    wget --progress=bar:force:noscroll \
-      --header="Authorization: Bearer $HF_TOKEN" \
-      -O "${OPENCLAW_MODEL_PATH}.tmp" \
-      "https://huggingface.co/${HF_REPO}/resolve/main/${OPENCLAW_MODEL_FILE}"
-    mv "${OPENCLAW_MODEL_PATH}.tmp" "$OPENCLAW_MODEL_PATH"
-  fi
-else
-  echo "Model $OPENCLAW_MODEL_FILE already exists, skipping download."
+if [ -z "$HF_TOKEN" ]; then
+  echo ""
+  echo "A HuggingFace account and token are required to download this model."
+  echo "  1. Create an account at https://huggingface.co if you don't have one."
+  echo "  2. Accept the model license at: https://huggingface.co/${HF_REPO}"
+  echo "  3. Create a read-only token at: https://huggingface.co/settings/tokens"
+  echo ""
+  printf "Paste your HuggingFace token and press Enter: "
+  read -r HF_TOKEN < /dev/tty
 fi
 
-###############################################################################
-# llama-server systemd service                                                #
-###############################################################################
+if [ -z "$HF_TOKEN" ]; then
+  echo "WARNING: No HuggingFace token provided. The model download may fail."
+  echo "Re-run with: HF_TOKEN=hf_yourtoken $0"
+fi
 
-LLAMA_MODEL_PATH="$OPENCLAW_MODEL_PATH"
-LLAMA_SERVICE_USER="$USER"
+sudo mkdir -p /opt/openclaw/models
+sudo chown -R "$USER":"$USER" /opt/openclaw
 
 # Physical core count: "Core(s) per socket" * "Socket(s)" (excludes hyperthreads)
 LLAMA_THREADS=$(( \
@@ -211,24 +170,6 @@ else
   LLAMA_CTX_SIZE=32768
 fi
 
-# mlock: only if RAM >= model_size * 1.25 (keeps the model pinned in RAM, no swap)
-# The atomic tmp→final move above guarantees this path is always a complete file.
-model_size_bytes=$(du -b "$LLAMA_MODEL_PATH" | awk '{print $1}')
-# Ceil-divide bytes -> GB so we don't underestimate the model's footprint
-model_size_gb=$(( (model_size_bytes + 1073741823) / 1073741824 ))
-mlock_threshold_gb=$(( model_size_gb * 5 / 4 ))
-if [ "$total_ram_gb" -ge "$mlock_threshold_gb" ]; then
-  LLAMA_MLOCK="--mlock"
-else
-  LLAMA_MLOCK=""
-fi
-
-# Build the ExecStart line; append --mlock only when RAM is sufficient
-LLAMA_EXECSTART="/opt/openclaw/llama.cpp/build/bin/llama-server --host 127.0.0.1 --port 8080 --model $LLAMA_MODEL_PATH --ctx-size $LLAMA_CTX_SIZE --threads $LLAMA_THREADS --parallel $LLAMA_PARALLEL --flash-attn"
-if [ -n "$LLAMA_MLOCK" ]; then
-  LLAMA_EXECSTART="$LLAMA_EXECSTART $LLAMA_MLOCK"
-fi
-
 sudo tee /etc/systemd/system/llama-server.service > /dev/null <<EOF
 [Unit]
 Description=llama-server OpenAI-compatible inference server
@@ -236,14 +177,24 @@ After=network.target
 
 [Service]
 Type=simple
-User=$LLAMA_SERVICE_USER
-ExecStart=$LLAMA_EXECSTART
+User=$USER
+Environment=HF_HOME=/opt/openclaw/models
+ExecStart=/opt/openclaw/llama.cpp/build/bin/llama-server \
+  --hf-repo ${HF_REPO} \
+  --hf-file ${HF_BASE_MODEL}-${HF_QUANT}.gguf \
+  --hf-token ${HF_TOKEN} \
+  --host 127.0.0.1 --port 8080 \
+  --ctx-size ${LLAMA_CTX_SIZE} \
+  --threads ${LLAMA_THREADS} \
+  --parallel ${LLAMA_PARALLEL} \
+  --flash-attn
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
+sudo chmod 600 /etc/systemd/system/llama-server.service
 sudo systemctl daemon-reload
 sudo systemctl enable llama-server
 sudo systemctl start llama-server
@@ -291,7 +242,8 @@ echo "llama-server config (derived from hardware):"
 echo "  --threads  $LLAMA_THREADS  (physical cores)"
 echo "  --parallel $LLAMA_PARALLEL  (slots; RAM: ${total_ram_gb}GB)"
 echo "  --ctx-size $LLAMA_CTX_SIZE"
-echo "  mlock:     ${LLAMA_MLOCK:-disabled}  (model: ${model_size_gb}GB, threshold: ${mlock_threshold_gb}GB)"
+echo "  --hf-repo  $HF_REPO"
+echo "  --hf-file  ${HF_BASE_MODEL}-${HF_QUANT}.gguf"
 echo ""
 echo "Next steps:"
 echo "  1. tailscale up       (authenticate Tailscale for internet access)"
