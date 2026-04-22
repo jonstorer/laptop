@@ -41,7 +41,7 @@ fi
 wait_for_apt
 sudo apt update
 
-apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck openssh-server ubuntu-desktop-minimal docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag shellcheck openssh-server ubuntu-desktop-minimal xclip docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
 # shellcheck disable=SC2086
 sudo apt install -y $apt_packages
 
