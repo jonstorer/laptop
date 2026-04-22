@@ -56,7 +56,7 @@ if ! node --version 2>/dev/null | grep -q '^v22\.'; then
 fi
 
 # Claude Code
-npm install -g @anthropic-ai/claude-code
+sudo npm install -g @anthropic-ai/claude-code
 
 # SSH
 sudo systemctl enable ssh
