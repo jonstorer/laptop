@@ -259,9 +259,22 @@ fi
 # OpenClaw browser config — headless Chromium via Playwright                 #
 ###############################################################################
 
-# Install deb Chromium explicitly — NOT chromium-browser which is a snap
-# wrapper on Ubuntu 24.04 and breaks OpenClaw's ability to control it
-sudo apt install -y --no-install-recommends chromium
+# Install real deb Chromium — Ubuntu 24.04 redirects both 'chromium' and
+# 'chromium-browser' to a snap wrapper, so we pull directly from the
+# Debian archive instead
+if ! command -v chromium-browser > /dev/null 2>&1 || snap list chromium > /dev/null 2>&1; then
+  sudo snap remove chromium 2>/dev/null || true
+  sudo apt remove --purge -y chromium-browser 2>/dev/null || true
+
+  # Add Debian bookworm archive for real chromium deb
+  wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg
+  echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] \
+    http://dl.google.com/linux/chrome/deb/ stable main" \
+    | sudo tee /etc/apt/sources.list.d/google-chrome.list > /dev/null
+  sudo apt update
+  sudo apt install -y google-chrome-stable
+fi
 
 mkdir -p "$HOME/.openclaw"
 
@@ -300,7 +313,7 @@ echo "Setup complete."
 echo ""
 echo "Local IP:     $LOCAL_IP"
 echo "SSH:          ssh $USER@$LOCAL_IP"
-echo "Browser:      headless Chromium via Playwright (openclaw profile, noSandbox)"
+echo "Browser:      headless Google Chrome (openclaw profile, noSandbox)"
 echo "llama-server: http://127.0.0.1:8080/v1"
 echo ""
 echo "llama-server config (derived from hardware):"
