@@ -262,7 +262,7 @@ fi
 # Install real deb Chromium — Ubuntu 24.04 redirects both 'chromium' and
 # 'chromium-browser' to a snap wrapper, so we pull directly from the
 # Debian archive instead
-if ! command -v chromium-browser > /dev/null 2>&1 || snap list chromium > /dev/null 2>&1; then
+if ! command -v google-chrome-stable > /dev/null 2>&1; then
   sudo snap remove chromium 2>/dev/null || true
   sudo apt remove --purge -y chromium-browser 2>/dev/null || true
 
