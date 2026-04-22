@@ -120,21 +120,43 @@ fi
 # Model download                                                              #
 ###############################################################################
 
-OPENCLAW_MODEL_FILE="${OPENCLAW_MODEL_FILE:-Mistral-Small-3.1-24B-Instruct-2503-Q4_K_M.gguf}"
-OPENCLAW_MODEL_URL="${OPENCLAW_MODEL_URL:-https://huggingface.co/bartowski/Mistral-Small-3.1-24B-Instruct-2503-GGUF/resolve/main/$OPENCLAW_MODEL_FILE}"
+HF_AUTHOR="${HF_AUTHOR:-bartowski}"
+HF_BASE_MODEL="${HF_BASE_MODEL:-mistralai_Mistral-Small-3.2-24B-Instruct-2506}"
+HF_REPO="${HF_REPO:-${HF_AUTHOR}/${HF_BASE_MODEL}-GGUF}"
+HF_QUANT="${HF_QUANT:-Q4_K_M}"
+OPENCLAW_MODELS_DIR="/opt/openclaw/models"
 
-sudo mkdir -p /opt/openclaw/models
+sudo mkdir -p "$OPENCLAW_MODELS_DIR"
 sudo chown -R "$USER":"$USER" /opt/openclaw
 
-# Remove any stale partial download from a previous interrupted run
-rm -f "/opt/openclaw/models/$OPENCLAW_MODEL_FILE.tmp"
+echo "Resolving model file from https://huggingface.co/${HF_REPO} ..."
+OPENCLAW_MODEL_FILE=$(wget -qO- "https://huggingface.co/api/models/${HF_REPO}" | \
+  python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+files = [s['rfilename'] for s in data.get('siblings', [])
+         if s['rfilename'].endswith('.gguf')
+         and '${HF_QUANT}' in s['rfilename']
+         and 'mmproj' not in s['rfilename']
+         and 'imatrix' not in s['rfilename']]
+files.sort()
+if not files:
+    print('ERROR: no matching .gguf file found in ${HF_REPO}', file=sys.stderr)
+    print('Browse available files at: https://huggingface.co/${HF_REPO}', file=sys.stderr)
+    sys.exit(1)
+print(files[0])
+")
+OPENCLAW_MODEL_PATH="$OPENCLAW_MODELS_DIR/$OPENCLAW_MODEL_FILE"
 
-if [ ! -f "/opt/openclaw/models/$OPENCLAW_MODEL_FILE" ]; then
+# Remove any stale partial download from a previous interrupted run
+rm -f "${OPENCLAW_MODEL_PATH}.tmp"
+
+if [ ! -f "$OPENCLAW_MODEL_PATH" ]; then
   if [ -z "$HF_TOKEN" ]; then
     echo ""
     echo "A HuggingFace account and token are required to download this model."
     echo "  1. Create an account at https://huggingface.co if you don't have one."
-    echo "  2. Accept the model license at: https://huggingface.co/bartowski/Mistral-Small-3.1-24B-Instruct-2503-GGUF"
+    echo "  2. Accept the model license at: https://huggingface.co/${HF_REPO}"
     echo "  3. Create a read-only token at: https://huggingface.co/settings/tokens"
     echo ""
     printf "Paste your HuggingFace token and press Enter: "
@@ -148,10 +170,9 @@ if [ ! -f "/opt/openclaw/models/$OPENCLAW_MODEL_FILE" ]; then
     echo "Downloading model $OPENCLAW_MODEL_FILE ..."
     wget --progress=bar:force:noscroll \
       --header="Authorization: Bearer $HF_TOKEN" \
-      -O "/opt/openclaw/models/$OPENCLAW_MODEL_FILE.tmp" \
-      "$OPENCLAW_MODEL_URL"
-    mv "/opt/openclaw/models/$OPENCLAW_MODEL_FILE.tmp" \
-       "/opt/openclaw/models/$OPENCLAW_MODEL_FILE"
+      -O "${OPENCLAW_MODEL_PATH}.tmp" \
+      "https://huggingface.co/${HF_REPO}/resolve/main/${OPENCLAW_MODEL_FILE}"
+    mv "${OPENCLAW_MODEL_PATH}.tmp" "$OPENCLAW_MODEL_PATH"
   fi
 else
   echo "Model $OPENCLAW_MODEL_FILE already exists, skipping download."
@@ -161,7 +182,7 @@ fi
 # llama-server systemd service                                                #
 ###############################################################################
 
-LLAMA_MODEL_PATH="/opt/openclaw/models/$OPENCLAW_MODEL_FILE"
+LLAMA_MODEL_PATH="$OPENCLAW_MODEL_PATH"
 LLAMA_SERVICE_USER="$USER"
 
 # Physical core count: "Core(s) per socket" * "Socket(s)" (excludes hyperthreads)
