@@ -55,8 +55,17 @@ if ! node --version 2>/dev/null | grep -q '^v22\.'; then
   sudo apt install -y nodejs
 fi
 
+# Configure npm to use a user-owned prefix so global installs never need sudo
+NPM_GLOBAL="$HOME/.npm-global"
+mkdir -p "$NPM_GLOBAL"
+npm config set prefix "$NPM_GLOBAL"
+export PATH="$NPM_GLOBAL/bin:$PATH"
+if ! grep -q 'NPM_GLOBAL' "$HOME/.zshrc" 2>/dev/null; then
+  printf '\nexport NPM_GLOBAL="$HOME/.npm-global"\nexport PATH="$NPM_GLOBAL/bin:$PATH"\n' >> "$HOME/.zshrc"
+fi
+
 # Claude Code
-sudo npm install -g @anthropic-ai/claude-code
+npm install -g @anthropic-ai/claude-code
 
 # SSH
 sudo systemctl enable ssh
