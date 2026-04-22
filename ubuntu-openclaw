@@ -99,11 +99,13 @@ sudo chown -R "$USER":"$USER" /opt/openclaw
 
 if [ ! -d "/opt/openclaw/llama.cpp/.git" ]; then
   git clone https://github.com/ggerganov/llama.cpp.git /opt/openclaw/llama.cpp
+  llama_pull_output="(fresh clone)"
 else
-  git -C /opt/openclaw/llama.cpp pull
+  llama_pull_output=$(git -C /opt/openclaw/llama.cpp pull)
 fi
 
-if [ ! -f "/opt/openclaw/llama.cpp/build/bin/llama-server" ]; then
+if [ ! -f "/opt/openclaw/llama.cpp/build/bin/llama-server" ] || \
+   [ "$(echo "$llama_pull_output" | grep -c 'Already up to date.')" -eq 0 ]; then
   echo "Building llama.cpp ..."
   cmake -B /opt/openclaw/llama.cpp/build \
     -DCMAKE_BUILD_TYPE=Release \
@@ -114,6 +116,8 @@ if [ ! -f "/opt/openclaw/llama.cpp/build/bin/llama-server" ]; then
     -DLLAMA_BUILD_SERVER=ON \
     /opt/openclaw/llama.cpp
   cmake --build /opt/openclaw/llama.cpp/build --config Release -j "$(nproc)"
+else
+  echo "llama.cpp is up to date, skipping build."
 fi
 
 ###############################################################################
@@ -197,7 +201,7 @@ EOF
 sudo chmod 600 /etc/systemd/system/llama-server.service
 sudo systemctl daemon-reload
 sudo systemctl enable llama-server
-sudo systemctl start llama-server
+sudo systemctl restart llama-server
 
 ###############################################################################
 # zsh                                                                         #
