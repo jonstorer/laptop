@@ -87,6 +87,30 @@ if ! grep -q 'NPM_GLOBAL' "$HOME/.zshrc" 2>/dev/null; then
   printf '\nexport NPM_GLOBAL="$HOME/.npm-global"\nexport PATH="$NPM_GLOBAL/bin:$PATH"\n' >> "$HOME/.zshrc"
 fi
 
+###############################################################################
+# Homebrew                                                                    #
+###############################################################################
+
+if ! command -v brew > /dev/null 2>&1; then
+  echo "Installing Homebrew ..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+# Add brew to PATH for the current session and persist to .zshrc
+if [ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  if ! grep -q 'linuxbrew' "$HOME/.zshrc" 2>/dev/null; then
+    # shellcheck disable=SC2016
+    printf '\neval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\n' >> "$HOME/.zshrc"
+  fi
+fi
+
+###############################################################################
+# gogcli — Google Workspace CLI                                               #
+###############################################################################
+
+brew install gogcli
+
 # Claude Code
 npm install -g @anthropic-ai/claude-code
 
@@ -328,5 +352,6 @@ echo "Next steps:"
 echo "  1. Open a new terminal  (so PATH changes from this script take effect)"
 echo "  2. tailscale up         (authenticate Tailscale for internet access)"
 echo "  3. openclaw onboard     (configure OpenClaw when ready)"
+echo "  gogcli:  gog auth credentials <client_secret.json> && gog auth add <email>"
 echo "============================================================"
 
