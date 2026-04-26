@@ -1,66 +1,85 @@
 #!/bin/sh
 
 # Welcome to the mac-openclaw machine script!
-# Sets up a Mac to run OpenClaw as a persistent autonomous agent.
-# After this script completes, run: openclaw onboard
+# Sets up macOS to run OpenClaw as a persistent autonomous agent.
+# After this script completes, run: openclaw onboard --install-daemon
 
 # Ask for sudo upfront so we don't have to get it later
 sudo -v
 
-# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
+# Keep using sudo so the permissions don't time out
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
 # shellcheck disable=SC2154
 trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
+###############################################################################
+# Homebrew                                                                    #
+###############################################################################
+
 if ! command -v brew > /dev/null 2>&1; then
   echo "Installing Homebrew ..."
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+fi
+
+# x86_64: /usr/local  |  arm64: /opt/homebrew
+if [ "$(uname -m)" = "arm64" ]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
+else
+  eval "$(/usr/local/bin/brew shellenv)"
 fi
 
 echo "Updating Homebrew ..."
 brew update --force
 
 brew bundle --file=- <<EOF
-# GUI apps — kept for physical access / debugging
+# GUI apps -- for physical access / debugging
 cask "alfred"
-cask "docker-desktop"
-cask "google-chrome"
+cask "bluebubbles"
 cask "iterm2"
 cask "rectangle"
 cask "slack"
 cask "textmate"
 
-# AI
-cask "ollama-app"
+# Browser -- required for OpenClaw browser automation
+cask "google-chrome"
 
-# Tunneling — useful for exposing the gateway or webhooks
-cask "ngrok"
-
-# Libraries & Tools
-brew "gnupg"
-brew "openssl"
-brew "shellcheck"
-brew "gcc"
-brew "git"
-brew "htop"
-brew "watch"
-brew "the_silver_searcher"
-brew "tmux"
-brew "vim"
-brew "zsh"
-brew "tmate"
-brew "grep"
-brew "jq"
-brew "forego"
-
-# Node.js v22 — required by OpenClaw
+# Node.js v22 -- required by OpenClaw
 brew "node@22"
+
+# Google Workspace CLI
+brew "gogcli"
+
+# Config manipulation
+brew "jq"
+brew "yq"
+
+# Networking
+brew "curl"
+brew "wget"
+brew "nmap"
+brew "netcat"
+brew "tailscale"
+
+# Search / filter
+brew "ripgrep"
+brew "fzf"
+
+# GitHub CLI
+brew "gh"
+
+# PostgreSQL client only (keg-only -- does not install the server)
+brew "libpq"
+
+# Scripting
+brew "python"
+
+# Media processing
+brew "ffmpeg"
+brew "imagemagick"
 EOF
 
-echo "Upgrading installed packages ..."
 brew upgrade
 
 # Put node@22 on PATH for this session
@@ -70,21 +89,193 @@ if [ -d "$node22_bin" ]; then
   export PATH="$node22_bin:$PATH"
 fi
 
+###############################################################################
+# npm global prefix -- user-owned, no sudo needed                            #
+###############################################################################
+
+NPM_GLOBAL="$HOME/.npm-global"
+mkdir -p "$NPM_GLOBAL"
+npm config set prefix "$NPM_GLOBAL"
+export PATH="$NPM_GLOBAL/bin:$PATH"
+
+###############################################################################
+# Claude CLI                                                                  #
+###############################################################################
+
+if [ ! -f "$HOME/.local/bin/claude" ]; then
+  echo "Installing Claude CLI ..."
+  curl -fsSL 'https://claude.ai/install.sh' | bash
+else
+  echo "Claude CLI already installed, skipping."
+fi
+
+###############################################################################
+# SSH -- enable Remote Login for remote access                               #
+###############################################################################
+
+sudo systemsetup -setremotelogin on 2>/dev/null || true
+
+###############################################################################
+# Internet Sharing                                                            #
+###############################################################################
+
+# Detect the WiFi (from) interface for display and initial config
+wifi_if=$(networksetup -listallhardwareports 2>/dev/null | awk '/Wi-Fi/{getline; print $2; exit}')
+if [ -z "$wifi_if" ]; then
+  wifi_if="en0"
+fi
+
+echo "Configuring Internet Sharing (from: $wifi_if) ..."
+
+# Helper script: detects the active Ethernet interface at runtime and writes
+# the full ICS configuration. Run by launchd at boot and on network changes,
+# so Ethernet does not need to be connected when this script runs.
+ICS_SCRIPT="/usr/local/sbin/openclaw-ics"
+sudo mkdir -p /usr/local/sbin
+
+sudo tee "$ICS_SCRIPT" > /dev/null <<'SCRIPT'
+#!/bin/sh
+PLIST="/Library/Preferences/SystemConfiguration/com.apple.nat.plist"
+
+wifi_if=$(networksetup -listallhardwareports 2>/dev/null | awk '/Wi-Fi/{getline; print $2; exit}')
+if [ -z "$wifi_if" ]; then
+  wifi_if="en0"
+fi
+
+eth_if=""
+for iface in en1 en2 en3 en4 en5; do
+  if ifconfig "$iface" 2>/dev/null | grep -q "status: active"; then
+    eth_if="$iface"
+    break
+  fi
+done
+
+if [ -z "$eth_if" ]; then
+  logger -t openclaw-ics "No active Ethernet interface -- ICS not configured"
+  exit 0
+fi
+
+# Skip write if already configured correctly
+current_eth=$(plutil -extract SharingNetworkInterface.0 raw "$PLIST" 2>/dev/null || true)
+current_enabled=$(plutil -extract NAT.Enabled raw "$PLIST" 2>/dev/null || true)
+if [ "$current_eth" = "$eth_if" ] && [ "$current_enabled" = "1" ]; then
+  exit 0
+fi
+
+logger -t openclaw-ics "Configuring ICS: $wifi_if -> $eth_if"
+
+NAT_JSON=$(printf '{"Enabled":1,"PrimaryInterface":{"Device":"%s","EnabledByUser":true},"SharingNetworkMask":"255.255.255.0","SharingNetworkNumberStart":"192.168.2.0"}' "$wifi_if")
+
+plutil -replace NAT -json "$NAT_JSON" "$PLIST" 2>/dev/null || \
+  plutil -insert NAT -json "$NAT_JSON" "$PLIST"
+
+plutil -replace SharingNetworkInterface -json "[\"$eth_if\"]" "$PLIST" 2>/dev/null || \
+  plutil -insert SharingNetworkInterface -json "[\"$eth_if\"]" "$PLIST"
+
+logger -t openclaw-ics "ICS configured: $wifi_if -> $eth_if (192.168.2.0/24)"
+SCRIPT
+
+sudo chmod 755 "$ICS_SCRIPT"
+
+# Launchd daemon: runs the helper at boot and whenever network config changes
+ICS_PLIST="/Library/LaunchDaemons/ai.openclaw.internet-sharing.plist"
+
+sudo tee "$ICS_PLIST" > /dev/null <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ai.openclaw.internet-sharing</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$ICS_SCRIPT</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>WatchPaths</key>
+    <array>
+        <string>/private/var/run/resolv.conf</string>
+    </array>
+</dict>
+</plist>
+EOF
+
+sudo chown root:wheel "$ICS_PLIST"
+sudo chmod 644 "$ICS_PLIST"
+
+# Idempotent load: unload if already running, then reload
+sudo launchctl bootout system/ai.openclaw.internet-sharing 2>/dev/null || true
+sudo launchctl bootstrap system "$ICS_PLIST"
+
+# Run immediately in case Ethernet is already connected
+sudo "$ICS_SCRIPT"
+
+echo ""
+echo "WiFi interface (from): $wifi_if"
+echo "Ethernet interface (to): detected at boot via openclaw-ics"
+echo "Services subnet: 192.168.2.0/24"
+
+###############################################################################
+# poke-messages -- keep Messages.app alive for BlueBubbles                  #
+###############################################################################
+
+# Messages.app can go idle on autonomous setups and miss incoming messages.
+# This LaunchAgent pokes it every 5 minutes to keep it responsive.
+POKE_SCRIPT="$HOME/Scripts/poke-messages.scpt"
+POKE_PLIST="$HOME/Library/LaunchAgents/com.user.poke-messages.plist"
+
+mkdir -p "$HOME/Scripts"
+cat > "$POKE_SCRIPT" <<'SCPT'
+tell application "Messages"
+    launch
+    count every chat
+end tell
+SCPT
+
+mkdir -p "$HOME/Library/LaunchAgents"
+cat > "$POKE_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.poke-messages</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/osascript</string>
+        <string>$HOME/Scripts/poke-messages.scpt</string>
+    </array>
+</dict>
+</plist>
+EOF
+
+# Idempotent load: unload if already running, then reload
+launchctl bootout "gui/$(id -u)/com.user.poke-messages" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$POKE_PLIST"
+
+###############################################################################
+# zsh                                                                         #
+###############################################################################
+
 shell_path="$(command -v zsh)"
-echo "Ensure shell is zsh at '$shell_path' ..."
-if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-  echo "Add '$shell_path' to /etc/shells"
+echo "Ensuring default shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
 sudo chsh -s "$shell_path" "$USER"
 
 ###############################################################################
-# macOS defaults                                                              #
+# macOS defaults -- automation-friendly only                                 #
 ###############################################################################
 
 echo "Configuring macOS defaults ..."
 
-# Keep background processes alive — prevents macOS from auto-terminating services
+# Keep background processes alive
 defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
 
 # No iCloud document syncing
@@ -102,21 +293,12 @@ defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
 defaults write com.apple.screensaver askForPassword -int 1
 defaults write com.apple.screensaver askForPasswordDelay -int 0
 
-# No .DS_Store files on network volumes
+# No .DS_Store on network volumes
 defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
 
 # No confirmation dialogs that could block automation
 defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
 defaults write com.apple.finder WarnOnEmptyTrash -bool false
-
-# Terminal/iTerm2 — for physical access sessions
-defaults write com.apple.terminal StringEncodings -array 4
-defaults write com.google.iterm2 DimBackgroundWindows -bool false
-defaults write com.google.iterm2 DimInactiveSplitPanes -bool false
-defaults write com.google.iterm2 HideScrollbar -bool true
-defaults write com.google.iterm2 PromptOnQuit -bool true
-defaults write com.google.iterm2 QuitWhenAllWindowsClosed -bool true
-
 
 for app in "Dock" "Finder" "SystemUIServer"; do
   killall "$app" > /dev/null 2>&1 || true
@@ -128,15 +310,35 @@ echo "macOS defaults configured."
 # OpenClaw                                                                    #
 ###############################################################################
 
-echo "Installing/updating OpenClaw ..."
-curl -fsSL --proto '=https' --tlsv1.2 'https://openclaw.ai/install.sh' -o /tmp/openclaw-install.sh
-OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
-rm -f /tmp/openclaw-install.sh
+OPENCLAW_LATEST=$(npm view openclaw version 2>/dev/null || true)
+OPENCLAW_INSTALLED=$(openclaw --version 2>/dev/null | awk '{print $2}' || true)
+
+if [ -n "$OPENCLAW_LATEST" ] && [ "$OPENCLAW_INSTALLED" = "$OPENCLAW_LATEST" ]; then
+  echo "OpenClaw $OPENCLAW_INSTALLED is already up to date, skipping."
+else
+  echo "Installing/updating OpenClaw ($OPENCLAW_INSTALLED -> $OPENCLAW_LATEST) ..."
+  curl -fsSL 'https://openclaw.ai/install.sh' | bash -s -- --no-onboard
+fi
+
+###############################################################################
+# Summary                                                                     #
+###############################################################################
+
+LOCAL_IP="$(ipconfig getifaddr "$wifi_if" 2>/dev/null || echo 'unknown')"
 
 echo ""
 echo "============================================================"
-echo "OpenClaw is installed. To finish setup, run:"
-echo "  openclaw onboard"
+echo "Setup complete."
 echo ""
-echo "This will configure your messaging channels and API keys."
+echo "Local IP (WiFi):     $LOCAL_IP"
+echo "SSH:                 ssh $USER@$LOCAL_IP"
+echo "Ethernet sharing to: detected at boot (openclaw-ics)"
+echo "Services subnet:     192.168.2.0/24"
+echo ""
+echo "Next steps:"
+echo "  1. Open a new terminal"
+echo "  2. claude                              (authenticate Claude CLI)"
+echo "  3. Launch BlueBubbles, sign in, enable web API, note server URL + password"
+echo "  4. Approve Automation permission when osascript prompts for Messages.app access"
+echo "  5. openclaw onboard --install-daemon   (when ready, after Linux box is configured)"
 echo "============================================================"
