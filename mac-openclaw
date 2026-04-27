@@ -101,6 +101,12 @@ mkdir -p "$NPM_GLOBAL"
 npm config set prefix "$NPM_GLOBAL"
 export PATH="$NPM_GLOBAL/bin:$PATH"
 
+# Persist npm global bin to PATH for new shells
+ZPROFILE="$HOME/.zprofile"
+if ! grep -qF 'npm-global' "$ZPROFILE" 2>/dev/null; then
+  printf '\nexport PATH="$HOME/.npm-global/bin:$PATH"\n' >> "$ZPROFILE"
+fi
+
 ###############################################################################
 # Claude CLI                                                                  #
 ###############################################################################
