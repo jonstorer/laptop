@@ -75,6 +75,9 @@ brew "libpq"
 # Scripting
 brew "python"
 
+# Terminal multiplexer
+brew "tmux"
+
 # Media processing
 brew "ffmpeg"
 brew "imagemagick"
