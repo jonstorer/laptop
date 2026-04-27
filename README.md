@@ -126,7 +126,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
 **CLI tools:** node@22, gogcli, jq, yq, curl, wget, nmap, netcat, tailscale, ripgrep, fzf, gh, libpq, python, ffmpeg, imagemagick
 
-**Claude CLI:** installed via the official installer (`claude.ai/install.sh`). Authenticate with `claude` after install.
+**Claude CLI:** installed via npm (`@anthropic-ai/claude-code`) — the native binary requires AVX2 which the 2013 Mac Pro Xeon doesn't support. Authenticate with `claude` after install.
 
 **OpenClaw:** installed via the official installer. Run `openclaw onboard --install-daemon` to configure.
 

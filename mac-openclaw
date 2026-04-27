@@ -102,9 +102,11 @@ export PATH="$NPM_GLOBAL/bin:$PATH"
 # Claude CLI                                                                  #
 ###############################################################################
 
-if [ ! -f "$HOME/.local/bin/claude" ]; then
+if ! command -v claude >/dev/null 2>&1; then
   echo "Installing Claude CLI ..."
-  curl -fsSL 'https://claude.ai/install.sh' | bash
+  # Native installer binary requires AVX2 (unsupported on 2013 Mac Pro Ivy Bridge-E).
+  # Install via npm so it runs on Node.js instead.
+  npm install -g @anthropic-ai/claude-code
 else
   echo "Claude CLI already installed, skipping."
 fi
