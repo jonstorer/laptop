@@ -37,7 +37,7 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 #### Mac — OpenClaw Agent (Apple Silicon)
 
-Sets up a Mac to run [OpenClaw](https://openclaw.ai) as a persistent autonomous agent. After the script completes, run `openclaw onboard`.
+Sets up a Mac to run [OpenClaw](https://openclaw.ai) as a persistent autonomous agent. After the script completes, run `openclaw onboard --install-daemon`.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-openclaw' | sh
@@ -122,11 +122,21 @@ Sets zsh as the default shell and applies macOS defaults.
 
 Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
-**Casks:** alfred, docker-desktop, google-chrome, iterm2, rectangle, slack, textmate, ngrok, ollama-app
+**Casks:** alfred, bluebubbles, google-chrome, iterm2, rectangle, slack, textmate
 
-**CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, node@22
+**CLI tools:** node@22, gogcli, jq, yq, curl, wget, nmap, netcat, tailscale, ripgrep, fzf, gh, libpq, python, ffmpeg, imagemagick
 
-**OpenClaw:** installed via the official installer. Run `openclaw onboard` to configure.
+**Claude CLI:** installed via the official installer (`claude.ai/install.sh`). Authenticate with `claude` after install.
+
+**OpenClaw:** installed via the official installer. Run `openclaw onboard --install-daemon` to configure.
+
+**SSH:** Remote Login enabled so the machine is accessible over the network.
+
+**Internet Sharing:** WiFi → Ethernet sharing configured via a launchd daemon (`openclaw-ics`). Detects the active Ethernet interface at boot and shares the WiFi connection over the 192.168.2.0/24 subnet.
+
+**BlueBubbles keep-alive:** a LaunchAgent (`poke-messages`) pokes Messages.app every 5 minutes to keep it responsive for BlueBubbles.
+
+Sets zsh as the default shell and applies macOS defaults optimized for autonomous/headless operation.
 
 #### Mac — Intel (x86_64)
 
