@@ -272,7 +272,9 @@ echo "Ensuring default shell is zsh at '$shell_path' ..."
 if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
-sudo chsh -s "$shell_path" "$USER"
+if [ "$SHELL" != "$shell_path" ]; then
+  sudo chsh -s "$shell_path" "$USER"
+fi
 
 ###############################################################################
 # macOS defaults -- automation-friendly only                                 #
