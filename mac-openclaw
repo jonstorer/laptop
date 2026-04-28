@@ -124,7 +124,20 @@ fi
 # SSH -- enable Remote Login for remote access                               #
 ###############################################################################
 
-sudo systemsetup -setremotelogin on 2>/dev/null || true
+# systemsetup -setremotelogin silently fails on Sonoma; use launchctl directly
+sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist 2>/dev/null || true
+
+###############################################################################
+# Screen Sharing -- enable VNC for remote desktop                            #
+###############################################################################
+
+sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
+
+###############################################################################
+# Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
+###############################################################################
+
+sudo brew services start tailscale 2>/dev/null || true
 
 ###############################################################################
 # Internet Sharing                                                            #
@@ -345,13 +358,18 @@ echo "Setup complete."
 echo ""
 echo "Local IP (WiFi):     $LOCAL_IP"
 echo "SSH:                 ssh $USER@$LOCAL_IP"
+echo "Screen Sharing:      vnc://$LOCAL_IP"
 echo "Ethernet sharing to: detected at boot (openclaw-ics)"
 echo "Services subnet:     192.168.2.0/24"
+echo ""
+echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
+echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
 echo ""
 echo "Next steps:"
 echo "  1. Open a new terminal"
 echo "  2. claude                              (authenticate Claude CLI)"
-echo "  3. Launch BlueBubbles, sign in, enable web API, note server URL + password"
-echo "  4. Approve Automation permission when osascript prompts for Messages.app access"
-echo "  5. openclaw onboard --install-daemon   (when ready, after Linux box is configured)"
+echo "  3. sudo tailscale up                   (authenticate Tailscale -- opens browser)"
+echo "  4. Launch BlueBubbles, sign in, enable web API, note server URL + password"
+echo "  5. Approve Automation permission when osascript prompts for Messages.app access"
+echo "  6. openclaw onboard --install-daemon   (when ready, after Linux box is configured)"
 echo "============================================================"
