@@ -109,19 +109,6 @@ if ! grep -qF 'npm-global' "$ZPROFILE" 2>/dev/null; then
 fi
 
 ###############################################################################
-# Claude CLI                                                                  #
-###############################################################################
-
-if ! command -v claude >/dev/null 2>&1; then
-  echo "Installing Claude CLI ..."
-  # Native installer binary requires AVX2 (unsupported on 2013 Mac Pro Ivy Bridge-E).
-  # Install via npm so it runs on Node.js instead.
-  npm install -g @anthropic-ai/claude-code
-else
-  echo "Claude CLI already installed, skipping."
-fi
-
-###############################################################################
 # SSH -- enable Remote Login for remote access                               #
 ###############################################################################
 
@@ -141,105 +128,11 @@ sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.pli
 sudo brew services start tailscale 2>/dev/null || true
 
 ###############################################################################
-# Internet Sharing                                                            #
+# Internet Sharing -- en2 (WiFi) to en0, en1 (Ethernet)                     #
 ###############################################################################
 
-# Detect the WiFi (from) interface for display and initial config
-wifi_if=$(networksetup -listallhardwareports 2>/dev/null | awk '/Wi-Fi/{getline; print $2; exit}')
-if [ -z "$wifi_if" ]; then
-  wifi_if="en0"
-fi
-
-echo "Configuring Internet Sharing (from: $wifi_if) ..."
-
-# Helper script: detects the active Ethernet interface at runtime and writes
-# the full ICS configuration. Run by launchd at boot and on network changes,
-# so Ethernet does not need to be connected when this script runs.
-ICS_SCRIPT="/usr/local/sbin/openclaw-ics"
-sudo mkdir -p /usr/local/sbin
-
-sudo tee "$ICS_SCRIPT" > /dev/null <<'SCRIPT'
-#!/bin/sh
-PLIST="/Library/Preferences/SystemConfiguration/com.apple.nat.plist"
-
-wifi_if=$(networksetup -listallhardwareports 2>/dev/null | awk '/Wi-Fi/{getline; print $2; exit}')
-if [ -z "$wifi_if" ]; then
-  wifi_if="en0"
-fi
-
-eth_if=""
-for iface in en1 en2 en3 en4 en5; do
-  if ifconfig "$iface" 2>/dev/null | grep -q "status: active"; then
-    eth_if="$iface"
-    break
-  fi
-done
-
-if [ -z "$eth_if" ]; then
-  logger -t openclaw-ics "No active Ethernet interface -- ICS not configured"
-  exit 0
-fi
-
-# Skip write if already configured correctly
-current_eth=$(plutil -extract SharingNetworkInterface.0 raw "$PLIST" 2>/dev/null || true)
-current_enabled=$(plutil -extract NAT.Enabled raw "$PLIST" 2>/dev/null || true)
-if [ "$current_eth" = "$eth_if" ] && [ "$current_enabled" = "1" ]; then
-  exit 0
-fi
-
-logger -t openclaw-ics "Configuring ICS: $wifi_if -> $eth_if"
-
-NAT_JSON=$(printf '{"Enabled":1,"PrimaryInterface":{"Device":"%s","EnabledByUser":true},"SharingNetworkMask":"255.255.255.0","SharingNetworkNumberStart":"192.168.2.0"}' "$wifi_if")
-
-plutil -replace NAT -json "$NAT_JSON" "$PLIST" 2>/dev/null || \
-  plutil -insert NAT -json "$NAT_JSON" "$PLIST"
-
-plutil -replace SharingNetworkInterface -json "[\"$eth_if\"]" "$PLIST" 2>/dev/null || \
-  plutil -insert SharingNetworkInterface -json "[\"$eth_if\"]" "$PLIST"
-
-logger -t openclaw-ics "ICS configured: $wifi_if -> $eth_if (192.168.2.0/24)"
-SCRIPT
-
-sudo chmod 755 "$ICS_SCRIPT"
-
-# Launchd daemon: runs the helper at boot and whenever network config changes
-ICS_PLIST="/Library/LaunchDaemons/ai.openclaw.internet-sharing.plist"
-
-sudo tee "$ICS_PLIST" > /dev/null <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>ai.openclaw.internet-sharing</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>$ICS_SCRIPT</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>WatchPaths</key>
-    <array>
-        <string>/private/var/run/resolv.conf</string>
-    </array>
-</dict>
-</plist>
-EOF
-
-sudo chown root:wheel "$ICS_PLIST"
-sudo chmod 644 "$ICS_PLIST"
-
-# Idempotent load: unload if already running, then reload
-sudo launchctl bootout system/ai.openclaw.internet-sharing 2>/dev/null || true
-sudo launchctl bootstrap system "$ICS_PLIST"
-
-# Run immediately in case Ethernet is already connected
-sudo "$ICS_SCRIPT"
-
-echo ""
-echo "WiFi interface (from): $wifi_if"
-echo "Ethernet interface (to): detected at boot via openclaw-ics"
-echo "Services subnet: 192.168.2.0/24"
+# com.apple.nat.plist is already configured -- just ensure the service is running
+sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.InternetSharing.plist 2>/dev/null || true
 
 ###############################################################################
 # poke-messages -- keep Messages.app alive for BlueBubbles                  #
@@ -351,7 +244,7 @@ fi
 # Summary                                                                     #
 ###############################################################################
 
-LOCAL_IP="$(ipconfig getifaddr "$wifi_if" 2>/dev/null || echo 'unknown')"
+LOCAL_IP="$(ipconfig getifaddr en2 2>/dev/null || echo 'unknown')"
 
 echo ""
 echo "============================================================"
@@ -360,17 +253,15 @@ echo ""
 echo "Local IP (WiFi):     $LOCAL_IP"
 echo "SSH:                 ssh $USER@$LOCAL_IP"
 echo "Screen Sharing:      vnc://$LOCAL_IP"
-echo "Ethernet sharing to: detected at boot (openclaw-ics)"
-echo "Services subnet:     192.168.2.0/24"
+echo "Internet Sharing:    en2 (WiFi) -> en0, en1 (Ethernet)"
 echo ""
 echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
 echo ""
 echo "Next steps:"
 echo "  1. Open a new terminal"
-echo "  2. claude                              (authenticate Claude CLI)"
-echo "  3. sudo tailscale up                   (authenticate Tailscale -- opens browser)"
-echo "  4. Launch BlueBubbles, sign in, enable web API, note server URL + password"
-echo "  5. Approve Automation permission when osascript prompts for Messages.app access"
-echo "  6. openclaw onboard --install-daemon   (when ready, after Linux box is configured)"
+echo "  2. sudo tailscale up                   (authenticate Tailscale -- opens browser)"
+echo "  3. Launch BlueBubbles, sign in, enable web API, note server URL + password"
+echo "  4. Approve Automation permission when osascript prompts for Messages.app access"
+echo "  5. openclaw onboard --install-daemon"
 echo "============================================================"
