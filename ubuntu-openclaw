@@ -1,39 +1,19 @@
 #!/bin/sh
 
 # Welcome to the ubuntu-openclaw machine script!
-# Sets up Ubuntu x86_64 to run OpenClaw as a persistent autonomous agent.
+# Sets up Ubuntu 26.04 LTS Desktop (amd64) as a complete standalone OpenClaw installation.
+# OpenClaw gateway + Claude CLI backend + WhatsApp channel. No Mac required.
+# After this script completes, follow the manual steps shown in the summary.
 
 # Ask for sudo upfront so we don't have to get it later
 sudo -v
 
-# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
+# Keep using sudo so the permissions don't time out
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
 # shellcheck disable=SC2154
 trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
-
-###############################################################################
-# Cleanup — remove packages not needed for headless autonomous operation      #
-###############################################################################
-
-sudo apt remove --purge -y \
-  ubuntu-desktop-minimal \
-  gnome-remote-desktop \
-  gdm3 \
-  lightdm \
-  xrdp \
-  xorgxrdp \
-  2>/dev/null || true
-
-sudo apt autoremove --purge -y
-
-# Remove snap Chromium if present — OpenClaw requires the deb version
-if snap list chromium 2>/dev/null | grep -q chromium; then
-  sudo snap remove chromium
-fi
-
-rm -f "$HOME/.xsession"
 
 # Wait for apt locks to be released
 wait_for_apt() {
@@ -43,224 +23,169 @@ wait_for_apt() {
   done
 }
 
-sudo apt update
-sudo apt full-upgrade -y
-
-sudo apt-get install -y ca-certificates gnupg wget
-
-if [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
-  sudo install -m 0755 -d /etc/apt/keyrings
-  wget -qO- https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  sudo chmod a+r /etc/apt/keyrings/docker.gpg
-
-# shellcheck disable=SC1091
-  echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-fi
+###############################################################################
+# System packages                                                             #
+###############################################################################
 
 wait_for_apt
 sudo apt update
+sudo apt full-upgrade -y
 
-apt_packages="build-essential gcc g++ cmake make git libssl-dev zsh htop jq vim tmux watch silversearcher-ag ripgrep shellcheck curl openssh-server xclip docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
-# shellcheck disable=SC2086
-sudo apt install -y $apt_packages
+sudo apt install -y \
+  ca-certificates \
+  curl \
+  git \
+  gnupg \
+  htop \
+  jq \
+  ripgrep \
+  tmux \
+  vim \
+  wget \
+  yq \
+  zsh
 
-sudo usermod -aG docker "$USER"
+###############################################################################
+# GitHub CLI -- official apt repository                                       #
+###############################################################################
 
-# Node.js v22 via NodeSource
-if ! node --version 2>/dev/null | grep -q '^v22\.'; then
-  echo "Installing Node.js v22 ..."
+if ! command -v gh > /dev/null 2>&1; then
+  echo "Installing GitHub CLI ..."
+  sudo install -d -m 0755 /usr/share/keyrings
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    | sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
+  sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
   wait_for_apt
-  wget -qO- https://deb.nodesource.com/setup_22.x | sudo -E bash -
-  sudo apt install -y nodejs
+  sudo apt update
+  sudo apt install -y gh
+else
+  echo "GitHub CLI already installed, skipping."
 fi
 
-# Configure npm to use a user-owned prefix so global installs never need sudo
+###############################################################################
+# Node.js v22 -- via NodeSource (deb822 format, distro-agnostic)             #
+###############################################################################
+
+if ! node --version 2>/dev/null | grep -q '^v22\.'; then
+  echo "Installing Node.js 22 via NodeSource ..."
+  sudo install -d -m 0755 /usr/share/keyrings
+  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+    | sudo gpg --dearmor --batch --yes -o /usr/share/keyrings/nodesource.gpg
+  sudo chmod 644 /usr/share/keyrings/nodesource.gpg
+  printf 'Types: deb\nURIs: https://deb.nodesource.com/node_22.x\nSuites: nodistro\nComponents: main\nArchitectures: %s\nSigned-By: /usr/share/keyrings/nodesource.gpg\n' \
+    "$(dpkg --print-architecture)" \
+    | sudo tee /etc/apt/sources.list.d/nodesource.sources > /dev/null
+  wait_for_apt
+  sudo apt update
+  sudo apt install -y nodejs
+else
+  echo "Node.js 22 already installed, skipping."
+fi
+
+###############################################################################
+# npm global prefix -- user-owned, no sudo needed                            #
+###############################################################################
+
 NPM_GLOBAL="$HOME/.npm-global"
 mkdir -p "$NPM_GLOBAL"
 npm config set prefix "$NPM_GLOBAL"
 export PATH="$NPM_GLOBAL/bin:$PATH"
-if ! grep -q 'NPM_GLOBAL' "$HOME/.zshrc" 2>/dev/null; then
+
+ZPROFILE="$HOME/.zprofile"
+if ! grep -qF 'npm-global' "$ZPROFILE" 2>/dev/null; then
   # shellcheck disable=SC2016
-  printf '\nexport NPM_GLOBAL="$HOME/.npm-global"\nexport PATH="$NPM_GLOBAL/bin:$PATH"\n' >> "$HOME/.zshrc"
+  printf '\nexport PATH="$HOME/.npm-global/bin:$PATH"\n' >> "$ZPROFILE"
 fi
 
 ###############################################################################
-# Homebrew                                                                    #
+# Claude CLI -- via official apt repository                                   #
 ###############################################################################
 
-if ! command -v brew > /dev/null 2>&1; then
-  echo "Installing Homebrew ..."
-  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-fi
-
-# Add brew to PATH for the current session and persist to .zshrc
-if [ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-  if ! grep -q 'linuxbrew' "$HOME/.zshrc" 2>/dev/null; then
-    # shellcheck disable=SC2016
-    printf '\neval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\n' >> "$HOME/.zshrc"
-  fi
-fi
-
-###############################################################################
-# gogcli — Google Workspace CLI                                               #
-###############################################################################
-
-brew install gogcli
-
-# Claude Code
-npm install -g @anthropic-ai/claude-code
-
-# SSH
-sudo systemctl enable ssh
-sudo systemctl start ssh
-
-###############################################################################
-# Tailscale                                                                   #
-###############################################################################
-
-wait_for_apt
-if ! command -v tailscale > /dev/null 2>&1; then
-  echo "Installing Tailscale ..."
-  wget -qO- https://tailscale.com/install.sh | sh
-fi
-sudo systemctl enable tailscaled
-sudo systemctl start tailscaled
-
-###############################################################################
-# llama.cpp                                                                   #
-###############################################################################
-
-sudo mkdir -p /opt/openclaw/llama.cpp
-sudo chown -R "$USER":"$USER" /opt/openclaw
-
-if [ ! -d "/opt/openclaw/llama.cpp/.git" ]; then
-  git clone https://github.com/ggerganov/llama.cpp.git /opt/openclaw/llama.cpp
-  llama_pull_output="(fresh clone)"
+if ! command -v claude > /dev/null 2>&1; then
+  echo "Installing Claude CLI ..."
+  sudo install -d -m 0755 /etc/apt/keyrings
+  sudo curl -fsSL https://downloads.claude.ai/keys/claude-code.asc \
+    -o /etc/apt/keyrings/claude-code.asc
+  echo "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main" \
+    | sudo tee /etc/apt/sources.list.d/claude-code.list > /dev/null
+  wait_for_apt
+  sudo apt update
+  sudo apt install -y claude-code
 else
-  llama_pull_output=$(git -C /opt/openclaw/llama.cpp pull)
+  echo "Claude CLI already installed, skipping."
 fi
-
-if [ ! -f "/opt/openclaw/llama.cpp/build/bin/llama-server" ] || \
-   [ "$(echo "$llama_pull_output" | grep -c 'Already up to date.')" -eq 0 ]; then
-  echo "Building llama.cpp ..."
-  cmake -B /opt/openclaw/llama.cpp/build \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DGGML_AVX2=ON \
-    -DGGML_F16C=ON \
-    -DGGML_FMA=ON \
-    -DGGML_CUDA=OFF \
-    -DLLAMA_BUILD_SERVER=ON \
-    /opt/openclaw/llama.cpp
-  cmake --build /opt/openclaw/llama.cpp/build --config Release -j "$(nproc)"
-else
-  echo "llama.cpp is up to date, skipping build."
-fi
-
-###############################################################################
-# llama-server systemd service (model downloaded via -hf on first start)     #
-###############################################################################
-
-HF_AUTHOR="${HF_AUTHOR:-bartowski}"
-HF_BASE_MODEL="${HF_BASE_MODEL:-mistralai_Mistral-Small-3.2-24B-Instruct-2506}"
-HF_QUANT="${HF_QUANT:-Q4_K_M}"
-HF_REPO="${HF_REPO:-${HF_AUTHOR}/${HF_BASE_MODEL}-GGUF}"
-
-if [ -z "$HF_TOKEN" ]; then
-  echo ""
-  echo "A HuggingFace account and token are required to download this model."
-  echo "  1. Create an account at https://huggingface.co if you don't have one."
-  echo "  2. Accept the model license at: https://huggingface.co/${HF_REPO}"
-  echo "  3. Create a read-only token at: https://huggingface.co/settings/tokens"
-  echo ""
-  printf "Paste your HuggingFace token and press Enter: "
-  read -r HF_TOKEN < /dev/tty
-fi
-
-if [ -z "$HF_TOKEN" ]; then
-  echo "WARNING: No HuggingFace token provided. The model download may fail."
-  echo "Re-run with: HF_TOKEN=hf_yourtoken $0"
-fi
-
-sudo mkdir -p /opt/openclaw/models
-sudo chown -R "$USER":"$USER" /opt/openclaw
-
-# Physical core count: "Core(s) per socket" * "Socket(s)" (excludes hyperthreads)
-LLAMA_THREADS=$(( \
-  $(lscpu | awk '/^Core\(s\) per socket:/ {print $NF}') * \
-  $(lscpu | awk '/^Socket\(s\):/ {print $NF}') \
-))
-
-# Total RAM in GB (MemTotal from /proc/meminfo is in kB)
-total_ram_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
-total_ram_gb=$(( total_ram_kb / 1024 / 1024 ))
-
-# Model size via Content-Length header (follow redirects)
-HF_MODEL_URL="https://huggingface.co/${HF_REPO}/resolve/main/${HF_BASE_MODEL}-${HF_QUANT}.gguf"
-MODEL_SIZE_BYTES=$(curl -sIL "$HF_MODEL_URL" | awk '/^[Cc]ontent-[Ll]ength:/ {val=$2} END {print val+0}')
-MODEL_SIZE_GB=$(( (MODEL_SIZE_BYTES + 1073741823) / 1073741824 ))
-if [ "$MODEL_SIZE_BYTES" -eq 0 ]; then
-  echo "WARNING: Could not determine model size, falling back to 14GB estimate."
-  MODEL_SIZE_GB=14
-fi
-
-# Parallel slots: floor((RAM - model) / 2), clamped to [1, 8]
-AVAILABLE_RAM_GB=$(( total_ram_gb - MODEL_SIZE_GB ))
-LLAMA_PARALLEL=$(( AVAILABLE_RAM_GB / 2 ))
-if [ "$LLAMA_PARALLEL" -lt 1 ]; then LLAMA_PARALLEL=1; fi
-if [ "$LLAMA_PARALLEL" -gt 8 ]; then LLAMA_PARALLEL=8; fi
-
-# Context size based on RAM tier
-if [ "$total_ram_gb" -le 16 ]; then
-  LLAMA_CTX_SIZE=4096
-elif [ "$total_ram_gb" -le 32 ]; then
-  LLAMA_CTX_SIZE=8192
-elif [ "$total_ram_gb" -le 64 ]; then
-  LLAMA_CTX_SIZE=16384
-else
-  LLAMA_CTX_SIZE=32768
-fi
-
-sudo tee /etc/systemd/system/llama-server.service > /dev/null <<EOF
-[Unit]
-Description=llama-server OpenAI-compatible inference server
-After=network.target
-
-[Service]
-Type=simple
-User=$USER
-Environment=HF_HOME=/opt/openclaw/models
-ExecStart=/opt/openclaw/llama.cpp/build/bin/llama-server \
-  --model-url ${HF_MODEL_URL} \
-  --host 127.0.0.1 --port 8080 \
-  --ctx-size ${LLAMA_CTX_SIZE} \
-  --threads ${LLAMA_THREADS} \
-  --parallel ${LLAMA_PARALLEL} \
-  --flash-attn on
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable llama-server
-sudo systemctl restart llama-server
 
 ###############################################################################
 # zsh                                                                         #
 ###############################################################################
 
 shell_path="$(command -v zsh)"
-echo "Ensure shell is zsh at '$shell_path' ..."
-if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
-  echo "Add '$shell_path' to /etc/shells"
+echo "Ensuring default shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
   sudo sh -c "echo $shell_path >> /etc/shells"
 fi
-sudo chsh -s "$shell_path" "$USER"
+if [ "$SHELL" != "$shell_path" ]; then
+  sudo chsh -s "$shell_path" "$USER"
+fi
+
+###############################################################################
+# SSH -- openssh-server for remote access                                     #
+###############################################################################
+
+sudo apt install -y openssh-server
+sudo systemctl enable ssh
+sudo systemctl start ssh
+
+###############################################################################
+# VNC -- gnome-remote-desktop (shares existing Wayland/GNOME session)        #
+###############################################################################
+
+# Ubuntu 26.04 Desktop runs GNOME exclusively on Wayland. Traditional VNC
+# servers (TigerVNC, x11vnc) require X11 and do not work. gnome-remote-desktop
+# captures the live Wayland session via PipeWire and serves it over VNC (RFB)
+# on port 5900. Credentials must be configured manually after install (step 8).
+
+sudo apt install -y gnome-remote-desktop
+
+# Enable the user service; it starts automatically when the GNOME session loads.
+# Failure is non-fatal here in case DBUS is not available (e.g. SSH-only run).
+systemctl --user enable gnome-remote-desktop.service 2>/dev/null || true
+
+# Keep user session alive between logins so the service survives at boot.
+sudo loginctl enable-linger "$USER"
+
+# GDM autologin: ensures a GNOME session is always running at boot so
+# gnome-remote-desktop has a session to attach to. Ubuntu Desktop ships
+# /etc/gdm3/custom.conf with these lines commented out; this uncomments them.
+if ! sudo grep -q "^AutomaticLoginEnable=true" /etc/gdm3/custom.conf 2>/dev/null; then
+  echo "Configuring GDM autologin for $USER ..."
+  sudo sed -i \
+    -e 's/^\s*#\s*AutomaticLoginEnable\s*=.*/AutomaticLoginEnable=true/' \
+    -e "s/^\s*#\s*AutomaticLogin\s*=.*/AutomaticLogin=$USER/" \
+    /etc/gdm3/custom.conf
+fi
+
+###############################################################################
+# Tailscale -- official apt repository                                        #
+###############################################################################
+
+if ! command -v tailscale > /dev/null 2>&1; then
+  echo "Installing Tailscale ..."
+  # shellcheck disable=SC1091
+  DISTRO_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+  curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${DISTRO_CODENAME}.noarmor.gpg" \
+    | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg > /dev/null
+  curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${DISTRO_CODENAME}.tailscale-keyring.list" \
+    | sudo tee /etc/apt/sources.list.d/tailscale.list > /dev/null
+  wait_for_apt
+  sudo apt update
+  sudo apt install -y tailscale
+fi
+
+sudo systemctl enable tailscaled
+sudo systemctl start tailscaled
 
 ###############################################################################
 # OpenClaw                                                                    #
@@ -269,61 +194,27 @@ sudo chsh -s "$shell_path" "$USER"
 OPENCLAW_LATEST=$(npm view openclaw version 2>/dev/null || true)
 OPENCLAW_INSTALLED=$(openclaw --version 2>/dev/null | awk '{print $2}' || true)
 
-if [ "$OPENCLAW_INSTALLED" = "$OPENCLAW_LATEST" ]; then
+if [ -n "$OPENCLAW_LATEST" ] && [ "$OPENCLAW_INSTALLED" = "$OPENCLAW_LATEST" ]; then
   echo "OpenClaw $OPENCLAW_INSTALLED is already up to date, skipping."
 else
   echo "Installing/updating OpenClaw ($OPENCLAW_INSTALLED -> $OPENCLAW_LATEST) ..."
-  wget -q -O /tmp/openclaw-install.sh 'https://openclaw.ai/install.sh'
-  OPENCLAW_NO_ONBOARD=1 OPENCLAW_NO_PROMPT=1 bash /tmp/openclaw-install.sh --no-onboard --no-prompt
-  rm -f /tmp/openclaw-install.sh
-  echo ""
-  echo "OpenClaw is installed. Run 'openclaw onboard' to configure when ready."
+  curl -fsSL 'https://openclaw.ai/install.sh' | bash -s -- --no-onboard
 fi
 
 ###############################################################################
-# OpenClaw browser config — headless Chromium via Playwright                 #
+# Git snapshot cron -- every 15 minutes                                       #
 ###############################################################################
 
-# Install real deb Chromium — Ubuntu 24.04 redirects both 'chromium' and
-# 'chromium-browser' to a snap wrapper, so we pull directly from the
-# Debian archive instead
-if ! command -v google-chrome-stable > /dev/null 2>&1; then
-  sudo snap remove chromium 2>/dev/null || true
-  sudo apt remove --purge -y chromium-browser 2>/dev/null || true
-
-  # Add Debian bookworm archive for real chromium deb
-  wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub \
-    | sudo gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg
-  echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] \
-    http://dl.google.com/linux/chrome/deb/ stable main" \
-    | sudo tee /etc/apt/sources.list.d/google-chrome.list > /dev/null
-  sudo apt update
-  sudo apt install -y google-chrome-stable
-fi
-
-mkdir -p "$HOME/.openclaw"
-
-OCJSON="$HOME/.openclaw/openclaw.json"
-
-if [ -f "$OCJSON" ]; then
-  tmp=$(mktemp)
-  jq '.browser = {
-    "enabled": true,
-    "defaultProfile": "openclaw",
-    "headless": true,
-    "noSandbox": true
-  }' "$OCJSON" > "$tmp" && mv "$tmp" "$OCJSON"
+if ! crontab -l 2>/dev/null | grep -qF '.openclaw'; then
+  (
+    crontab -l 2>/dev/null
+    cat <<'CRONEOF'
+*/15 * * * * cd $HOME/.openclaw && git add -A && git commit -m "auto snapshot $(date '+\%Y-\%m-\%d \%H:\%M')" && git push 2>/dev/null || true
+CRONEOF
+  ) | crontab -
+  echo "Cron job for ~/.openclaw snapshots added."
 else
-  cat > "$OCJSON" <<EOF
-{
-  "browser": {
-    "enabled": true,
-    "defaultProfile": "openclaw",
-    "headless": true,
-    "noSandbox": true
-  }
-}
-EOF
+  echo "OpenClaw cron job already present, skipping."
 fi
 
 ###############################################################################
@@ -336,22 +227,44 @@ echo ""
 echo "============================================================"
 echo "Setup complete."
 echo ""
-echo "Local IP:     $LOCAL_IP"
-echo "SSH:          ssh $USER@$LOCAL_IP"
-echo "Browser:      headless Google Chrome (openclaw profile, noSandbox)"
-echo "llama-server: http://127.0.0.1:8080/v1"
+echo "Local IP:  $LOCAL_IP"
+echo "SSH:       ssh $USER@$LOCAL_IP"
+echo "VNC:       $LOCAL_IP:5900  (gnome-remote-desktop, port 5900)"
+echo "           (credentials must be configured -- see step 8 below)"
 echo ""
-echo "llama-server config (derived from hardware):"
-echo "  --threads  $LLAMA_THREADS  (physical cores)"
-echo "  --parallel $LLAMA_PARALLEL  (slots)"
-echo "  --ctx-size $LLAMA_CTX_SIZE"
-echo "  model:     ${HF_BASE_MODEL}-${HF_QUANT}.gguf (${MODEL_SIZE_GB}GB)"
-echo "  available: ${AVAILABLE_RAM_GB}GB for KV cache  (RAM: ${total_ram_gb}GB)"
+echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
+echo "After Tailscale auth, SSH and VNC work from anywhere via Tailscale IP."
 echo ""
-echo "Next steps:"
-echo "  1. Open a new terminal  (so PATH changes from this script take effect)"
-echo "  2. tailscale up         (authenticate Tailscale for internet access)"
-echo "  3. openclaw onboard     (configure OpenClaw when ready)"
-echo "  gogcli:  gog auth credentials <client_secret.json> && gog auth add <email>"
+echo "Manual steps required:"
+echo ""
+echo "  1. claude"
+echo "     Authenticate Claude CLI (interactive TTY required)"
+echo ""
+echo "  2. openclaw models auth login --provider anthropic --method cli --set-default"
+echo "     Wire OpenClaw to Claude CLI (interactive TTY required)"
+echo ""
+echo "  3. sudo tailscale up"
+echo "     Authenticate Tailscale"
+echo ""
+echo "  4. openclaw onboard --install-daemon"
+echo "     Complete OpenClaw setup"
+echo ""
+echo "  5. Set up WhatsApp channel"
+echo "     Requires scanning QR code in browser -- use VNC if no physical display"
+echo ""
+echo "  6. Add your SSH public key:"
+echo "       ssh-copy-id $USER@$LOCAL_IP"
+echo "     or append manually to ~/.ssh/authorized_keys"
+echo ""
+echo "  7. Initialize ~/.openclaw as a git repo and add remote:"
+echo "       git -C ~/.openclaw init"
+echo "       git -C ~/.openclaw remote add origin <YOUR_REMOTE_URL>"
+echo "     (cron job silently no-ops until this is done)"
+echo ""
+echo "  8. Configure VNC credentials (required before VNC will accept connections):"
+echo "       grdctl vnc set-auth-method password"
+echo "       grdctl vnc set-password YOUR_VNC_PASSWORD"
+echo "       grdctl vnc enable"
+echo "       systemctl --user restart gnome-remote-desktop.service"
+echo "     Connect with any VNC client to $LOCAL_IP:5900"
 echo "============================================================"
-

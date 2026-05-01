@@ -15,7 +15,7 @@ Support For:
 * macOS (Apple Silicon) — `mac-agentic`, `mac-openclaw`
 * macOS (Intel x86_64) — `mac-x86_64`
 * Ubuntu 20.04+ — `ubuntu`
-* Ubuntu 24.04 x86_64 — `ubuntu-openclaw`
+* Ubuntu 26.04 LTS Desktop (amd64) — `ubuntu-openclaw`
 * Raspberry Pi (Ubuntu-based)
 * Windows 11
 
@@ -61,7 +61,7 @@ wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ub
 
 #### Ubuntu — OpenClaw Agent
 
-Sets up Ubuntu to run OpenClaw as a persistent autonomous agent with a local LLM via llama.cpp.
+Sets up Ubuntu 26.04 LTS Desktop as a complete standalone OpenClaw installation — gateway, Claude CLI backend, and WhatsApp channel. No Mac required.
 
 ```sh
 wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu-openclaw' | sh
@@ -156,21 +156,21 @@ For desktop machines (with display). Installs Docker (CE, compose, buildx) and c
 
 #### Ubuntu — OpenClaw Agent
 
-**Remote access:** SSH, xrdp (port 3389), Tailscale
+Standalone [OpenClaw](https://openclaw.ai) machine on Ubuntu 26.04 LTS Desktop (amd64). Everything runs here — no Mac involved.
 
-**Inference:** llama.cpp built from source with AVX2/F16C/FMA, no CUDA; OpenAI-compatible API on port 8080
+**Remote access:** SSH (password auth, key-based configured manually), VNC via gnome-remote-desktop (port 5900), Tailscale
 
-**Model:** Mistral-Small-3.1 24B Q4_K_M downloaded during install; override with `OPENCLAW_MODEL_FILE` and `OPENCLAW_MODEL_URL`
+**Claude CLI:** installed via official apt repository; authenticate with `claude` after install
 
-**OpenClaw:** binary installed; run `openclaw onboard` to configure
+**OpenClaw:** installed via official installer; wire to Claude CLI with `openclaw models auth login --provider anthropic --method cli --set-default`, then run `openclaw onboard --install-daemon`
+
+**WhatsApp channel:** set up after onboarding by scanning QR code in browser (use VNC if no physical display)
 
 **Node.js:** v22 via NodeSource
 
-**Docker:** CE
-
 **Shell:** zsh
 
-Run `tailscale up` after install to authenticate Tailscale for internet access. Run `openclaw onboard` to configure OpenClaw.
+**Git snapshots:** user crontab entry commits and pushes `~/.openclaw` every 15 minutes (initialize the repo and add a remote first)
 
 #### Raspberry Pi
 
