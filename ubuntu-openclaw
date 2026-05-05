@@ -271,8 +271,7 @@ fi
 # Time sync -- clock skew breaks WhatsApp and OAuth flows                    #
 ###############################################################################
 
-sudo systemctl restart systemd-timesyncd 2>/dev/null || \
-  sudo systemctl restart chrony 2>/dev/null || true
+sudo systemctl restart chrony 2>/dev/null || true
 
 ###############################################################################
 # Summary                                                                     #
