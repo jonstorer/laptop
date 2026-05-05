@@ -40,10 +40,12 @@ sudo apt install -y \
   gnupg \
   htop \
   jq \
+  libsqlite3-dev \
   pipx \
   procps \
   python3-pip \
   ripgrep \
+  sqlite3 \
   tmux \
   trash-cli \
   vim \
@@ -236,6 +238,17 @@ if [ -n "$OPENCLAW_LATEST" ] && [ "$OPENCLAW_INSTALLED" = "$OPENCLAW_LATEST" ]; 
 else
   echo "Installing/updating OpenClaw ($OPENCLAW_INSTALLED -> $OPENCLAW_LATEST) ..."
   curl -fsSL 'https://openclaw.ai/install.sh' | bash -s -- --no-onboard
+fi
+
+###############################################################################
+# OpenClaw plugins                                                            #
+###############################################################################
+
+if ! openclaw plugins list 2>/dev/null | grep -qF '@openclaw/whatsapp'; then
+  echo "Installing OpenClaw WhatsApp plugin ..."
+  openclaw plugins install @openclaw/whatsapp
+else
+  echo "OpenClaw WhatsApp plugin already installed, skipping."
 fi
 
 ###############################################################################
