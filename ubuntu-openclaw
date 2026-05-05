@@ -32,18 +32,53 @@ sudo apt update
 sudo apt full-upgrade -y
 
 sudo apt install -y \
+  build-essential \
   ca-certificates \
   curl \
+  file \
   git \
   gnupg \
   htop \
   jq \
+  pipx \
+  procps \
+  python3-pip \
   ripgrep \
   tmux \
+  trash-cli \
   vim \
   wget \
+  xclip \
   yq \
   zsh
+
+###############################################################################
+# Homebrew -- required by OpenClaw on Linux                                  #
+###############################################################################
+
+if ! command -v brew > /dev/null 2>&1; then
+  echo "Installing Homebrew ..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+fi
+
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+ZPROFILE="$HOME/.zprofile"
+if ! grep -qF 'linuxbrew' "$ZPROFILE" 2>/dev/null; then
+  # shellcheck disable=SC2016
+  printf '\neval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\n' >> "$ZPROFILE"
+fi
+
+###############################################################################
+# gogcli -- Google Workspace CLI, required for OpenClaw Google integration   #
+###############################################################################
+
+if ! command -v gogcli > /dev/null 2>&1; then
+  echo "Installing gogcli ..."
+  brew install gogcli
+else
+  echo "gogcli already installed, skipping."
+fi
 
 ###############################################################################
 # GitHub CLI -- official apt repository                                       #
@@ -138,6 +173,8 @@ sudo apt install -y openssh-server
 sudo systemctl enable ssh
 sudo systemctl start ssh
 
+[ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519 -C "openclaw@$(hostname)"
+
 ###############################################################################
 # VNC -- gnome-remote-desktop (shares existing Wayland/GNOME session)        #
 ###############################################################################
@@ -218,6 +255,12 @@ else
 fi
 
 ###############################################################################
+# Time sync -- clock skew breaks WhatsApp and OAuth flows                    #
+###############################################################################
+
+sudo systemctl restart systemd-timesyncd
+
+###############################################################################
 # Summary                                                                     #
 ###############################################################################
 
@@ -249,19 +292,38 @@ echo ""
 echo "  4. openclaw onboard --install-daemon"
 echo "     Complete OpenClaw setup"
 echo ""
-echo "  5. Set up WhatsApp channel"
+echo "  5. openclaw configure (or use the dashboard)"
+echo "     Link channels"
+echo ""
+echo "  6. gogcli auth login"
+echo "     Authenticate Google Workspace CLI (opens browser)"
+echo ""
+echo "  7. Set git identity:"
+echo "       git config --global user.name \"Your Name\""
+echo "       git config --global user.email \"you@example.com\""
+echo ""
+echo "  8. gh auth login"
+echo "     Authenticate GitHub CLI"
+echo ""
+echo "  9. Verify clock sync before attempting WhatsApp or Slack linking:"
+echo "       timedatectl"
+echo "     NTP synchronized should read 'yes'"
+echo ""
+echo " 10. Set up WhatsApp channel"
 echo "     Requires scanning QR code in browser -- use VNC if no physical display"
 echo ""
-echo "  6. Add your SSH public key:"
+echo " 11. SSH keys:"
+echo "     Public key for GitHub and outbound access: ~/.ssh/id_ed25519.pub"
+echo "     To allow SSH into this machine:"
 echo "       ssh-copy-id $USER@$LOCAL_IP"
 echo "     or append manually to ~/.ssh/authorized_keys"
 echo ""
-echo "  7. Initialize ~/.openclaw as a git repo and add remote:"
+echo " 12. Initialize ~/.openclaw as a git repo and add remote:"
 echo "       git -C ~/.openclaw init"
 echo "       git -C ~/.openclaw remote add origin <YOUR_REMOTE_URL>"
 echo "     (cron job silently no-ops until this is done)"
 echo ""
-echo "  8. Configure VNC credentials (required before VNC will accept connections):"
+echo " 13. Configure VNC credentials (required before VNC will accept connections):"
 echo "       grdctl vnc set-auth-method password"
 echo "       grdctl vnc set-password YOUR_VNC_PASSWORD"
 echo "       grdctl vnc enable"
