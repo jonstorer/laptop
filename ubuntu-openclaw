@@ -244,12 +244,7 @@ fi
 # OpenClaw plugins                                                            #
 ###############################################################################
 
-if ! openclaw plugins list 2>/dev/null | grep -qF '@openclaw/whatsapp'; then
-  echo "Installing OpenClaw WhatsApp plugin ..."
-  openclaw plugins install @openclaw/whatsapp
-else
-  echo "OpenClaw WhatsApp plugin already installed, skipping."
-fi
+openclaw plugins install @openclaw/whatsapp
 
 ###############################################################################
 # Git snapshot cron -- every 15 minutes                                       #
