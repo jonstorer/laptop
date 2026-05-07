@@ -102,7 +102,7 @@ npm config set prefix "$NPM_GLOBAL"
 export PATH="$NPM_GLOBAL/bin:$PATH"
 
 # Persist npm global bin to PATH for new shells
-ZPROFILE="$HOME/.zprofile"
+ZPROFILE="$HOME/.zprofile.local"
 if ! grep -qF 'npm-global' "$ZPROFILE" 2>/dev/null; then
   # shellcheck disable=SC2016
   printf '\nexport PATH="$HOME/.npm-global/bin:$PATH"\n' >> "$ZPROFILE"

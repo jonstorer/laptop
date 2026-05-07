@@ -65,7 +65,7 @@ fi
 
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
-ZPROFILE="$HOME/.zprofile"
+ZPROFILE="$HOME/.zprofile.local"
 if ! grep -qF 'linuxbrew' "$ZPROFILE" 2>/dev/null; then
   # shellcheck disable=SC2016
   printf '\neval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\n' >> "$ZPROFILE"
@@ -130,7 +130,7 @@ mkdir -p "$NPM_GLOBAL"
 npm config set prefix "$NPM_GLOBAL"
 export PATH="$NPM_GLOBAL/bin:$PATH"
 
-ZPROFILE="$HOME/.zprofile"
+ZPROFILE="$HOME/.zprofile.local"
 if ! grep -qF 'npm-global' "$ZPROFILE" 2>/dev/null; then
   # shellcheck disable=SC2016
   printf '\nexport PATH="$HOME/.npm-global/bin:$PATH"\n' >> "$ZPROFILE"
