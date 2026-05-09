@@ -11,6 +11,10 @@ sudo -v
 # Keep using sudo so the permissions don't time out
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
+# apt 3.x (Ubuntu 26.04) prompts "Continue? [Y/n]" even with -y when stdin is
+# a pipe. DEBIAN_FRONTEND=noninteractive suppresses all interactive apt prompts.
+export DEBIAN_FRONTEND=noninteractive
+
 # shellcheck disable=SC2154
 trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
@@ -28,10 +32,10 @@ wait_for_apt() {
 ###############################################################################
 
 wait_for_apt
-sudo apt update
-sudo apt full-upgrade -y
+sudo -E apt update
+sudo -E apt full-upgrade -y
 
-sudo apt install -y \
+sudo -E apt install -y \
   build-essential \
   ca-certificates \
   curl \
@@ -95,8 +99,8 @@ if ! command -v gh > /dev/null 2>&1; then
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
   wait_for_apt
-  sudo apt update
-  sudo apt install -y gh
+  sudo -E apt update
+  sudo -E apt install -y gh
 else
   echo "GitHub CLI already installed, skipping."
 fi
@@ -115,8 +119,8 @@ if ! node --version 2>/dev/null | grep -q '^v22\.'; then
     "$(dpkg --print-architecture)" \
     | sudo tee /etc/apt/sources.list.d/nodesource.sources > /dev/null
   wait_for_apt
-  sudo apt update
-  sudo apt install -y nodejs
+  sudo -E apt update
+  sudo -E apt install -y nodejs
 else
   echo "Node.js 22 already installed, skipping."
 fi
@@ -148,8 +152,8 @@ if ! command -v claude > /dev/null 2>&1; then
   echo "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main" \
     | sudo tee /etc/apt/sources.list.d/claude-code.list > /dev/null
   wait_for_apt
-  sudo apt update
-  sudo apt install -y claude-code
+  sudo -E apt update
+  sudo -E apt install -y claude-code
 else
   echo "Claude CLI already installed, skipping."
 fi
@@ -171,7 +175,7 @@ fi
 # SSH -- openssh-server for remote access                                     #
 ###############################################################################
 
-sudo apt install -y openssh-server
+sudo -E apt install -y openssh-server
 sudo systemctl enable ssh
 sudo systemctl start ssh
 
@@ -186,7 +190,7 @@ sudo systemctl start ssh
 # captures the live Wayland session via PipeWire and serves it over VNC (RFB)
 # on port 5900. Credentials must be configured manually after install (step 8).
 
-sudo apt install -y gnome-remote-desktop
+sudo -E apt install -y gnome-remote-desktop
 
 # Enable the user service; it starts automatically when the GNOME session loads.
 # Failure is non-fatal here in case DBUS is not available (e.g. SSH-only run).
@@ -219,8 +223,8 @@ if ! command -v tailscale > /dev/null 2>&1; then
   curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${DISTRO_CODENAME}.tailscale-keyring.list" \
     | sudo tee /etc/apt/sources.list.d/tailscale.list > /dev/null
   wait_for_apt
-  sudo apt update
-  sudo apt install -y tailscale
+  sudo -E apt update
+  sudo -E apt install -y tailscale
 fi
 
 sudo systemctl enable tailscaled
