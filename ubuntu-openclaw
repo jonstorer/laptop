@@ -182,13 +182,13 @@ sudo systemctl start ssh
 [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519 -C "openclaw@$(hostname)"
 
 ###############################################################################
-# VNC -- gnome-remote-desktop (shares existing Wayland/GNOME session)        #
+# RDP -- gnome-remote-desktop (shares existing Wayland/GNOME session)        #
 ###############################################################################
 
 # Ubuntu 26.04 Desktop runs GNOME exclusively on Wayland. Traditional VNC
 # servers (TigerVNC, x11vnc) require X11 and do not work. gnome-remote-desktop
-# captures the live Wayland session via PipeWire and serves it over VNC (RFB)
-# on port 5900. Credentials must be configured manually after install (step 8).
+# captures the live Wayland session via PipeWire and serves it over RDP
+# on port 3389. Credentials must be configured manually after install.
 
 sudo -E apt install -y gnome-remote-desktop
 
@@ -249,6 +249,7 @@ fi
 ###############################################################################
 
 openclaw plugins install --force @openclaw/whatsapp
+openclaw plugins install --force @openclaw/imessage
 
 ###############################################################################
 # Git snapshot cron -- every 15 minutes                                       #
@@ -273,6 +274,47 @@ fi
 sudo systemctl restart chrony 2>/dev/null || true
 
 ###############################################################################
+# TODO.md -- manual steps with live status                                   #
+###############################################################################
+
+_ok() { sh -c "$1" > /dev/null 2>&1 && printf 'x' || printf ' '; }
+
+_CLAUDE=$(_ok "claude auth status")
+_OC_MODELS=$(_ok "openclaw models list")
+_TS=$(_ok "tailscale status")
+_OC_DAEMON=$(_ok "openclaw status | grep -qi running")
+_GOGCLI=$(_ok "gogcli auth status")
+_GIT=$(_ok "git config --global user.name | grep -q . && git config --global user.email | grep -q .")
+_GH=$(_ok "gh auth status")
+_NTP=$(_ok "timedatectl | grep -q 'NTP synchronized: yes'")
+_SSH=$(_ok "test -f $HOME/.ssh/id_ed25519.pub")
+_OC_GIT=$(_ok "git -C $HOME/.openclaw rev-parse --git-dir")
+_RDP=$(_ok "grdctl rdp show | grep -qi enabled")
+_GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
+TODO_FILE="$PWD/TODO.md"
+
+cat > "$TODO_FILE" <<EOF
+# Ubuntu OpenClaw Setup
+
+_Last updated: $_GENERATED — rerun ubuntu-openclaw to refresh status._
+
+- [$_CLAUDE] Authenticate Claude CLI: \`claude\` (interactive TTY required)
+- [$_OC_MODELS] Wire OpenClaw to Claude: \`openclaw models auth login --provider anthropic --method cli --set-default\`
+- [$_TS] Authenticate Tailscale: \`sudo tailscale up\`
+- [$_OC_DAEMON] Complete OpenClaw onboarding: \`openclaw onboard --install-daemon\`
+- [ ] Link channels: \`openclaw configure\` or use the dashboard
+- [$_GOGCLI] Authenticate Google Workspace CLI: \`gogcli auth login\` (opens browser)
+- [$_GIT] Set git identity: \`git config --global user.name "Name" && git config --global user.email "you@example.com"\`
+- [$_GH] Authenticate GitHub CLI: \`gh auth login\`
+- [$_NTP] Verify clock sync: \`timedatectl\` (NTP synchronized should read 'yes')
+- [ ] Set up WhatsApp channel — scan QR code in browser (use RDP if no display)
+- [ ] Set up iMessage channel — \`openclaw configure\`, supply BlueBubbles URL and password from the Mac
+- [$_SSH] SSH key at \`~/.ssh/id_ed25519.pub\` — add to GitHub and/or \`~/.ssh/authorized_keys\`
+- [$_OC_GIT] Initialize \`~/.openclaw\` git repo: \`git -C ~/.openclaw init && git -C ~/.openclaw remote add origin <URL>\`
+- [$_RDP] Configure RDP: \`grdctl rdp set-credentials YOUR_USERNAME YOUR_PASSWORD && grdctl rdp enable && systemctl --user restart gnome-remote-desktop.service\`
+EOF
+
+###############################################################################
 # Summary                                                                     #
 ###############################################################################
 
@@ -284,61 +326,10 @@ echo "Setup complete."
 echo ""
 echo "Local IP:  $LOCAL_IP"
 echo "SSH:       ssh $USER@$LOCAL_IP"
-echo "VNC:       $LOCAL_IP:5900  (gnome-remote-desktop, port 5900)"
-echo "           (credentials must be configured -- see step 8 below)"
+echo "RDP:       $LOCAL_IP:3389"
 echo ""
 echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
-echo "After Tailscale auth, SSH and VNC work from anywhere via Tailscale IP."
+echo "After Tailscale auth, SSH and RDP work from anywhere via Tailscale IP."
 echo ""
-echo "Manual steps required:"
-echo ""
-echo "  1. claude"
-echo "     Authenticate Claude CLI (interactive TTY required)"
-echo ""
-echo "  2. openclaw models auth login --provider anthropic --method cli --set-default"
-echo "     Wire OpenClaw to Claude CLI (interactive TTY required)"
-echo ""
-echo "  3. sudo tailscale up"
-echo "     Authenticate Tailscale"
-echo ""
-echo "  4. openclaw onboard --install-daemon"
-echo "     Complete OpenClaw setup"
-echo ""
-echo "  5. openclaw configure (or use the dashboard)"
-echo "     Link channels"
-echo ""
-echo "  6. gogcli auth login"
-echo "     Authenticate Google Workspace CLI (opens browser)"
-echo ""
-echo "  7. Set git identity:"
-echo "       git config --global user.name \"Your Name\""
-echo "       git config --global user.email \"you@example.com\""
-echo ""
-echo "  8. gh auth login"
-echo "     Authenticate GitHub CLI"
-echo ""
-echo "  9. Verify clock sync before attempting WhatsApp or Slack linking:"
-echo "       timedatectl"
-echo "     NTP synchronized should read 'yes'"
-echo ""
-echo " 10. Set up WhatsApp channel"
-echo "     Requires scanning QR code in browser -- use VNC if no physical display"
-echo ""
-echo " 11. SSH keys:"
-echo "     Public key for GitHub and outbound access: ~/.ssh/id_ed25519.pub"
-echo "     To allow SSH into this machine:"
-echo "       ssh-copy-id $USER@$LOCAL_IP"
-echo "     or append manually to ~/.ssh/authorized_keys"
-echo ""
-echo " 12. Initialize ~/.openclaw as a git repo and add remote:"
-echo "       git -C ~/.openclaw init"
-echo "       git -C ~/.openclaw remote add origin <YOUR_REMOTE_URL>"
-echo "     (cron job silently no-ops until this is done)"
-echo ""
-echo " 13. Configure VNC credentials (required before VNC will accept connections):"
-echo "       grdctl vnc set-auth-method password"
-echo "       grdctl vnc set-password YOUR_VNC_PASSWORD"
-echo "       grdctl vnc enable"
-echo "       systemctl --user restart gnome-remote-desktop.service"
-echo "     Connect with any VNC client to $LOCAL_IP:5900"
+echo "Manual steps: $TODO_FILE"
 echo "============================================================"
