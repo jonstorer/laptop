@@ -12,7 +12,8 @@ Requirements
 
 Support For:
 
-* macOS (Apple Silicon) — `mac-agentic`, `mac-openclaw`
+* macOS (Apple Silicon) — `mac-agentic`
+* macOS (Apple Silicon or Intel x86_64) — `mac-openclaw`
 * macOS (Intel x86_64) — `mac-x86_64`
 * Ubuntu 20.04+ — `ubuntu`
 * Ubuntu 26.04 LTS Desktop (amd64) — `ubuntu-openclaw`
@@ -35,9 +36,9 @@ Human dev machine with AI workflows: Claude, Ollama, VS Code, Claude Code.
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-agentic' | sh
 ```
 
-#### Mac — OpenClaw Agent (Apple Silicon)
+#### Mac — OpenClaw iMessage Bridge (Apple Silicon or Intel x86_64)
 
-Sets up a Mac to run [OpenClaw](https://openclaw.ai) as a persistent autonomous agent. After the script completes, run `openclaw onboard --install-daemon`.
+Sets up a Mac as an iMessage bridge for a ubuntu-openclaw installation. BlueBubbles exposes Messages.app via web API; ubuntu-openclaw connects via the `@openclaw/imessage` plugin over Tailscale.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-openclaw' | sh
@@ -118,25 +119,25 @@ Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
 Sets zsh as the default shell and applies macOS defaults.
 
-#### Mac — OpenClaw Agent (Apple Silicon)
+#### Mac — OpenClaw iMessage Bridge (Apple Silicon or Intel x86_64)
 
-Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
+Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Silicon and Intel x86_64 (including the 2013 Mac Pro).
 
-**Casks:** alfred, bluebubbles, google-chrome, iterm2, rectangle, slack, textmate
+**Casks:** alfred, bluebubbles, google-chrome, iterm2, rectangle
 
-**CLI tools:** node@22, gogcli, jq, yq, curl, wget, nmap, netcat, tailscale, ripgrep, fzf, gh, libpq, python, ffmpeg, imagemagick
+**CLI tools:** jq, yq, curl, wget, tailscale, tmux
 
-**Claude CLI:** installed via npm (`@anthropic-ai/claude-code`) — the native binary requires AVX2 which the 2013 Mac Pro Xeon doesn't support. Authenticate with `claude` after install.
+**SSH:** Remote Login enabled for remote access.
 
-**OpenClaw:** installed via the official installer. Run `openclaw onboard --install-daemon` to configure.
+**Screen Sharing:** enabled for remote desktop.
 
-**SSH:** Remote Login enabled so the machine is accessible over the network.
-
-**Internet Sharing:** WiFi → Ethernet sharing configured via a launchd daemon (`openclaw-ics`). Detects the active Ethernet interface at boot and shares the WiFi connection over the 192.168.2.0/24 subnet.
+**Tailscale:** installed and daemon started; run `sudo tailscale up` to authenticate.
 
 **BlueBubbles keep-alive:** a LaunchAgent (`poke-messages`) pokes Messages.app every 5 minutes to keep it responsive for BlueBubbles.
 
 Sets zsh as the default shell and applies macOS defaults optimized for autonomous/headless operation.
+
+Writes a `TODO.md` to the working directory with live status checks for each manual step.
 
 #### Mac — Intel (x86_64)
 
@@ -158,13 +159,15 @@ For desktop machines (with display). Installs Docker (CE, compose, buildx) and c
 
 Standalone [OpenClaw](https://openclaw.ai) machine on Ubuntu 26.04 LTS Desktop (amd64). Everything runs here — no Mac involved.
 
-**Remote access:** SSH (password auth, key-based configured manually), VNC via gnome-remote-desktop (port 5900), Tailscale
+**Remote access:** SSH (password auth, key-based configured manually), RDP via gnome-remote-desktop (port 3389), Tailscale
 
 **Claude CLI:** installed via official apt repository; authenticate with `claude` after install
 
 **OpenClaw:** installed via official installer; wire to Claude CLI with `openclaw models auth login --provider anthropic --method cli --set-default`, then run `openclaw onboard --install-daemon`
 
-**WhatsApp channel:** set up after onboarding by scanning QR code in browser (use VNC if no physical display)
+**WhatsApp channel:** set up after onboarding by scanning QR code in browser (use RDP if no physical display)
+
+**iMessage channel:** connect to a mac-openclaw iMessage bridge via the `@openclaw/imessage` plugin over Tailscale
 
 **Node.js:** v22 via NodeSource
 
