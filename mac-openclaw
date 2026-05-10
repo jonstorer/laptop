@@ -65,13 +65,16 @@ brew upgrade
 ###############################################################################
 
 # systemsetup -setremotelogin silently fails on Sonoma; use launchctl directly
-sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+# load -w exits 37 if already loaded, which is fine; verify it's running after
+sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist 2>/dev/null || true
+sudo launchctl list com.openssh.sshd > /dev/null 2>&1 || { echo "ERROR: SSH daemon failed to start" >&2; exit 1; }
 
 ###############################################################################
 # Screen Sharing -- enable VNC for remote desktop                            #
 ###############################################################################
 
-sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
+sudo launchctl list com.apple.screensharing > /dev/null 2>&1 || { echo "ERROR: Screen Sharing failed to start" >&2; exit 1; }
 
 ###############################################################################
 # Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
@@ -187,7 +190,7 @@ _ok() { sh -c "$1" > /dev/null 2>&1 && printf 'x' || printf ' '; }
 _TS=$(_ok "tailscale status")
 _BB=$(_ok "pgrep -x BlueBubbles")
 _GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
-TODO_FILE="$PWD/TODO.md"
+TODO_FILE="$HOME/TODO.md"
 
 cat > "$TODO_FILE" <<EOF
 # Mac OpenClaw Setup
