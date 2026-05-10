@@ -64,17 +64,17 @@ brew upgrade
 # SSH -- enable Remote Login for remote access                               #
 ###############################################################################
 
-# systemsetup -setremotelogin silently fails on Sonoma; use launchctl directly
-# load -w exits 37 if already loaded, which is fine; verify it's running after
-sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist 2>/dev/null || true
-sudo launchctl list com.openssh.sshd > /dev/null 2>&1 || { echo "ERROR: SSH daemon failed to start" >&2; exit 1; }
+# Only load if not already running -- launchctl load on an already-bootstrapped
+# service produces noisy errors on Sonoma/Sequoia regardless of redirection
+sudo launchctl list com.openssh.sshd > /dev/null 2>&1 || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
 
 ###############################################################################
 # Screen Sharing -- enable VNC for remote desktop                            #
 ###############################################################################
 
-sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
-sudo launchctl list com.apple.screensharing > /dev/null 2>&1 || { echo "ERROR: Screen Sharing failed to start" >&2; exit 1; }
+sudo launchctl list com.apple.screensharing > /dev/null 2>&1 || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
 
 ###############################################################################
 # Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
