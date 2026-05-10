@@ -64,16 +64,14 @@ brew upgrade
 # SSH -- enable Remote Login for remote access                               #
 ###############################################################################
 
-# Only load if not already running -- launchctl load on an already-bootstrapped
-# service produces noisy errors on Sonoma/Sequoia regardless of redirection
-sudo launchctl list com.openssh.sshd > /dev/null 2>&1 || \
+pgrep sshd > /dev/null 2>&1 || \
   sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
 
 ###############################################################################
-# Screen Sharing -- enable VNC for remote desktop                            #
+# Screen Sharing -- enable for remote desktop                                #
 ###############################################################################
 
-sudo launchctl list com.apple.screensharing > /dev/null 2>&1 || \
+nc -z localhost 5900 2>/dev/null || \
   sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
 
 ###############################################################################
