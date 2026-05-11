@@ -109,15 +109,15 @@ What it sets up
 
 Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
-**Casks:** alfred, docker-desktop, google-chrome, iterm2, kap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, qlstephen, claude, ollama, visual-studio-code
+**Casks:** alfred, docker-desktop, google-chrome, iterm2, postman, rectangle, slack, spotify, textmate, karabiner-elements, ngrok, claude, claude-code, visual-studio-code
 
-**CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
+**CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, ripgrep, tmux, vim, zsh, tmate, grep, jq, forego, nodenv
 
-**Node.js:** asdf with asdf-nodejs plugin; installs current LTS and sets as global default.
+**Node.js:** nodenv installs the latest LTS (even-numbered major version) and sets it as the global default.
 
-**AI tools:** Claude Code (`@anthropic-ai/claude-code`) installed globally via npm. VS Code extension `anthropic.claude-code` installed automatically.
+**AI tools:** Claude Code installed via the official Homebrew cask. VS Code extension `anthropic.claude-code` installed automatically.
 
-Sets zsh as the default shell and applies macOS defaults.
+Sets zsh as the default shell and applies macOS defaults (including disabling Time Machine new-disk prompts).
 
 #### Mac — OpenClaw iMessage Bridge (Apple Silicon or Intel x86_64)
 

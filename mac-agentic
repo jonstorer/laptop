@@ -16,6 +16,10 @@ set -e
 if ! command -v brew > /dev/null 2>&1; then
   echo "Installing Homebrew ..."
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+fi
+
+# Ensure brew-installed binaries (nodenv, code, etc.) are on PATH for this script
+if ! command -v brew > /dev/null 2>&1; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
@@ -24,23 +28,21 @@ brew update --force
 
 brew bundle --file=- <<EOF
 cask "alfred"
-cask "docker-desktop"
+# cask "docker-desktop"
 cask "google-chrome"
 cask "iterm2"
-cask "kap"
-cask "postman"
-cask "rectangle"
+# cask "postman"
+# cask "rectangle"
 cask "slack"
-cask "spotify"
+# cask "spotify"
 cask "textmate"
 
-cask "karabiner-elements"
-cask "ngrok"
-cask "qlstephen"
+# cask "karabiner-elements"
+# cask "ngrok"
 
 # AI tooling
 cask "claude"
-cask "ollama-app"
+cask "claude-code"
 cask "visual-studio-code"
 
 # Libraries & Tools
@@ -52,6 +54,7 @@ brew "git"
 brew "htop"
 brew "watch"
 brew "the_silver_searcher"
+brew "ripgrep"
 brew "tmux"
 brew "vim"
 brew "zsh"
@@ -59,33 +62,30 @@ brew "tmate"
 brew "grep"
 brew "jq"
 brew "forego"
-brew "asdf"
+brew "nodenv"
 EOF
 
-# Configure asdf and Node.js
-if [ -f "$(brew --prefix asdf 2>/dev/null)/libexec/asdf.sh" ]; then
-  echo "Setting up asdf and Node.js ..."
-  # shellcheck disable=SC1091
-  . "$(brew --prefix asdf)/libexec/asdf.sh"
+# Configure nodenv and install latest Node.js LTS
+if command -v nodenv > /dev/null 2>&1; then
+  echo "Setting up nodenv and Node.js ..."
 
-  asdf plugin add nodejs 2>/dev/null || true
-  asdf install nodejs lts 2>/dev/null || true
-  node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
-  if [ -n "$node_version" ]; then
-    asdf set -u nodejs "$node_version"
-    echo "Node.js $node_version set as global default"
+  # Node.js LTS releases use even-numbered major versions
+  latest_lts=$(nodenv install -l 2>/dev/null | sed 's/^[[:space:]]*//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | awk -F. '$1 % 2 == 0' | tail -1)
+  if [ -n "$latest_lts" ]; then
+    nodenv install -s "$latest_lts"
+    nodenv global "$latest_lts"
+    echo "Node.js $latest_lts set as global default"
   fi
 
-  echo "Installing Claude Code ..."
-  npm install -g @anthropic-ai/claude-code
-
-  # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
+  # Shell init (.zshrc) is managed by dotfiles - do not modify
 fi
 
-# Install VS Code Claude extension (requires VS Code to be installed and 'code' in PATH)
-if command -v code > /dev/null 2>&1; then
-  echo "Installing VS Code Claude extension ..."
-  code --install-extension anthropic.claude-code 2>/dev/null || true
+# Install VS Code extensions (VS Code cask installs the binary at this path)
+vscode_cli="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+if [ -x "$vscode_cli" ]; then
+  echo "Installing VS Code extensions ..."
+  "$vscode_cli" --install-extension anthropic.claude-code
+  "$vscode_cli" --install-extension vscodevim.vim
 fi
 
 shell_path="$(command -v zsh)"
@@ -209,17 +209,11 @@ defaults write com.apple.DiskUtility DUDebugMenuEnabled -bool true
 defaults write com.apple.DiskUtility advanced-image-options -bool true
 
 ###############################################################################
-# DESTRUCTIVE - run only with OSX_DESTRUCTIVE=1                               #
+# Time Machine                                                                #
 ###############################################################################
 
-if [ "$OSX_DESTRUCTIVE" = "1" ]; then
-  echo "Applying destructive macOS defaults ..."
-  sudo defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
-  hash tmutil > /dev/null 2>&1 && sudo tmutil disable
-  echo "Destructive defaults applied."
-else
-  echo "Skipping destructive defaults. Set OSX_DESTRUCTIVE=1 to disable Time Machine, etc."
-fi
+# Don't prompt to use new disks for Time Machine backups
+sudo defaults write /Library/Preferences/com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
 
 ###############################################################################
 # Restart affected applications                                               #
