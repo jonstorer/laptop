@@ -15,8 +15,30 @@ while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 # a pipe. DEBIAN_FRONTEND=noninteractive suppresses all interactive apt prompts.
 export DEBIAN_FRONTEND=noninteractive
 
+# Run logging -- append one tab-separated line per run to ~/.laptop/runs.log so
+# it's easy to see which script ran on which host, when, for how long, against
+# which repo commit, and whether it succeeded. The commit is fetched lazily at
+# exit (via curl or wget) and falls back to "unknown" when offline or unset.
+LAPTOP_SCRIPT="ubuntu-openclaw"
+LAPTOP_RUN_START=$(date +%s)
+
+log_run() {
+  _ret="$1"
+  _dur=$(( $(date +%s) - LAPTOP_RUN_START ))
+  if [ "$_ret" -eq 0 ]; then _outcome="ok"; else _outcome="fail"; fi
+  _api="https://api.github.com/repos/jonstorer/laptop/commits/main"
+  _commit=$( { curl -fsSL "$_api" 2>/dev/null || wget -qO- "$_api" 2>/dev/null; } \
+    | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-12)
+  [ -n "$_commit" ] || _commit="unknown"
+  mkdir -p "$HOME/.laptop"
+  printf '%s\t%s\t%s\t%s\t%s\t%ss\texit=%s\n' \
+    "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+    "$LAPTOP_SCRIPT" "$(hostname)" "$_commit" \
+    "$_outcome" "$_dur" "$_ret" >> "$HOME/.laptop/runs.log"
+}
+
 # shellcheck disable=SC2154
-trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
 # Wait for apt locks to be released
@@ -229,6 +251,27 @@ fi
 
 sudo systemctl enable tailscaled
 sudo systemctl start tailscaled
+
+###############################################################################
+# Google Chrome -- real browser for OpenClaw (WhatsApp QR, web automation)   #
+###############################################################################
+
+# OpenClaw needs a real browser for QR-code login and browser automation.
+# Google publishes amd64-only debs via its official apt repository.
+if ! command -v google-chrome > /dev/null 2>&1; then
+  echo "Installing Google Chrome ..."
+  sudo install -d -m 0755 /etc/apt/keyrings
+  curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+    | sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/google-chrome.gpg
+  sudo chmod 644 /etc/apt/keyrings/google-chrome.gpg
+  echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" \
+    | sudo tee /etc/apt/sources.list.d/google-chrome.list > /dev/null
+  wait_for_apt
+  sudo -E apt update
+  sudo -E apt install -y google-chrome-stable
+else
+  echo "Google Chrome already installed, skipping."
+fi
 
 ###############################################################################
 # OpenClaw                                                                    #
