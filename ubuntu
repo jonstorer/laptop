@@ -8,8 +8,30 @@ sudo -v
 # Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
 while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
+# Run logging -- append one tab-separated line per run to ~/.laptop/runs.log so
+# it's easy to see which script ran on which host, when, for how long, against
+# which repo commit, and whether it succeeded. The commit is fetched lazily at
+# exit (via curl or wget) and falls back to "unknown" when offline or unset.
+LAPTOP_SCRIPT="ubuntu"
+LAPTOP_RUN_START=$(date +%s)
+
+log_run() {
+  _ret="$1"
+  _dur=$(( $(date +%s) - LAPTOP_RUN_START ))
+  if [ "$_ret" -eq 0 ]; then _outcome="ok"; else _outcome="fail"; fi
+  _api="https://api.github.com/repos/jonstorer/laptop/commits/main"
+  _commit=$( { curl -fsSL "$_api" 2>/dev/null || wget -qO- "$_api" 2>/dev/null; } \
+    | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-12)
+  [ -n "$_commit" ] || _commit="unknown"
+  mkdir -p "$HOME/.laptop"
+  printf '%s\t%s\t%s\t%s\t%s\t%ss\texit=%s\n' \
+    "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+    "$LAPTOP_SCRIPT" "$(hostname)" "$_commit" \
+    "$_outcome" "$_dur" "$_ret" >> "$HOME/.laptop/runs.log"
+}
+
 # shellcheck disable=SC2154
-trap 'ret=$?; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
 sudo apt update

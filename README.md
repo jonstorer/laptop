@@ -165,6 +165,8 @@ Standalone [OpenClaw](https://openclaw.ai) machine on Ubuntu 26.04 LTS Desktop (
 
 **OpenClaw:** installed via official installer; wire to Claude CLI with `openclaw models auth login --provider anthropic --method cli --set-default`, then run `openclaw onboard --install-daemon`
 
+**Browser:** Google Chrome stable (via Google's official apt repository) — a real browser for OpenClaw's QR-code login and browser automation
+
 **WhatsApp channel:** set up after onboarding by scanning QR code in browser (use RDP if no physical display)
 
 **iMessage channel:** connect to a mac-openclaw iMessage bridge via the `@openclaw/imessage` plugin over Tailscale
@@ -184,6 +186,37 @@ Same as Ubuntu plus **headless setup**: enables and starts the SSH service and c
 **Step 1** sets up [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) with Ubuntu, [Chocolatey](https://chocolatey.org/), and Windows apps: git, vscode, docker-desktop, googlechrome, slack, powershell. **Requires Administrator**; reboot if prompted.
 
 **Step 2** runs the Ubuntu script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1` — Docker Desktop provides Docker to WSL. After both steps you get the same environment as Mac/Ubuntu (asdf, Node.js LTS, zsh, tmux, etc.).
+
+Run log
+-------
+
+Every install script appends one line to `~/.laptop/runs.log` each time it runs,
+so you can see which script ran on which box, when, and whether it worked —
+without having to remember. Each line is tab-separated:
+
+```
+<timestamp>	<script>	<hostname>	<commit>	<outcome>	<duration>	exit=<code>
+```
+
+For example:
+
+```
+2026-06-04T11:42:07-0700	ubuntu-openclaw	openclaw-box	38149cd1f0a2	ok	214s	exit=0
+2026-06-02T09:15:33-0700	mac-agentic	Jonathons-MBP	5a6c09ebc7d1	fail	   8s	exit=1
+```
+
+- **commit** is the `main` HEAD short SHA fetched from GitHub at run time (the
+  version the piped script came from); `unknown` when offline.
+- **outcome** is `ok` / `fail` (`reboot` on Windows when WSL needs a restart).
+- **duration** is wall-clock seconds for the run.
+
+The Windows script writes the same format to `%USERPROFILE%\.laptop\runs.log`.
+
+View the most recent runs with:
+
+```sh
+column -t -s "$(printf '\t')" ~/.laptop/runs.log | tail
+```
 
 Contributing
 ------------

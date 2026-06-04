@@ -2,10 +2,34 @@
 
 Write-Host "Running laptop script..."
 
+# --- Run logging -------------------------------------------------------------
+# Append one tab-separated line per run to ~\.laptop\runs.log so it's easy to
+# see which script ran on which host, when, for how long, against which repo
+# commit, and the outcome (ok / fail / reboot). The commit is fetched from the
+# GitHub API and falls back to "unknown" when offline.
+$LaptopScript = "windows"
+$LaptopRunStart = Get-Date
+function Write-LaptopRun {
+  param([string]$Outcome)
+  $commit = "unknown"
+  try {
+    $resp = Invoke-RestMethod -Uri "https://api.github.com/repos/jonstorer/laptop/commits/main" `
+      -Headers @{ "User-Agent" = "laptop-script" } -ErrorAction Stop
+    if ($resp.sha) { $commit = $resp.sha.Substring(0, [Math]::Min(12, $resp.sha.Length)) }
+  } catch { }
+  $dur = [int]((Get-Date) - $LaptopRunStart).TotalSeconds
+  $dir = Join-Path $HOME ".laptop"
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  $line = "{0}`t{1}`t{2}`t{3}`t{4}`t{5}s" -f `
+    (Get-Date -Format "yyyy-MM-ddTHH:mm:sszzz"), $LaptopScript, $env:COMPUTERNAME, $commit, $Outcome, $dur
+  Add-Content -Path (Join-Path $dir "runs.log") -Value $line
+}
+
 # Require Administrator for WSL installation
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-Not $isAdmin) {
   Write-Host "This script must be run as Administrator (required for WSL setup). Right-click PowerShell and 'Run as Administrator'." -ForegroundColor Red
+  Write-LaptopRun "fail"
   exit 1
 }
 
@@ -45,6 +69,7 @@ if (-Not $wslReady) {
   if (-Not $wslReady) {
     Write-Host ""
     Write-Host "WSL installation requires a reboot. Please restart your computer, then run this script again." -ForegroundColor Yellow
+    Write-LaptopRun "reboot"
     exit 0
   }
 }
@@ -84,3 +109,5 @@ Write-Host "  2. If first time: complete Ubuntu username/password setup" -Foregr
 Write-Host "  3. Run the Ubuntu script from the README (use LAPTOP_SKIP_DOCKER=1 for WSL)" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Docker: Enable 'Use the WSL 2 based engine' in Docker Desktop Settings > General." -ForegroundColor Cyan
+
+Write-LaptopRun "ok"
