@@ -152,11 +152,11 @@ Writes a `TODO.md` to the working directory with live status checks for each man
 
 Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
-**Casks:** claude, claude-code, google-chrome
+**Casks:** claude-code, google-chrome
 
-**CLI tools:** git, gnupg, openssl, shellcheck, jq, htop, ripgrep, tmux, vim, zsh, gh, nodenv, tailscale
+**CLI tools:** git, gnupg, openssl, shellcheck, jq, htop, the_silver_searcher, tmux, vim, zsh, gh, mise, tailscale
 
-**Node.js:** nodenv installs the latest LTS (even-numbered major version) and sets it as the global default.
+**Node.js:** [mise](https://mise.jdx.dev) sets a global LTS default; per-repo pinned versions (e.g. mono-node's `mise.toml`/`.nvmrc`) take over automatically when you `cd` in.
 
 **SSH:** Remote Login enabled for remote access.
 
@@ -164,9 +164,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
 **Tailscale:** installed and daemon started; run `sudo tailscale up` to authenticate.
 
-**Power management:** `pmset` tuned for unattended operation (wake on network access, auto-restart after power failure). Actual sleep prevention with the lid closed is left to an app like Amphetamine, not scripted.
-
-**Scheduled jobs:** `~/.laptop/jobs` is created with a `README.md` documenting the LaunchAgent pattern for adding recurring jobs later — no job is installed by default.
+**Power management:** `pmset` tuned for unattended operation — `disablesleep` keeps the system awake independent of the display (which stays off with the lid closed), plus wake-on-network-access and auto-restart-after-power-failure. No third-party keep-awake app needed.
 
 Sets zsh as the default shell and applies the automation-friendly subset of macOS defaults (no confirmation dialogs, no iCloud doc sync, no Time Machine new-disk prompts).
 

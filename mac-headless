@@ -4,9 +4,8 @@
 # Sets up a headless MacBook Pro (Apple Silicon, lid closed, screen off) as a
 # Claude Code automation box: MCP-connected agent work now (e.g. Jira
 # cleanup), general dev work later. Reachable via SSH / Screen Sharing /
-# Tailscale, tuned to survive reboots and stay out of the way of unattended
-# automation. Actual sleep prevention with the lid closed is left to
-# Amphetamine (or similar) -- see the summary at the end.
+# Tailscale, tuned to survive reboots and stay awake (screen off, system on)
+# without any physical console.
 # After this script completes, follow the manual steps shown in the summary.
 
 # Ask for sudo upfront so we don't have to get it later
@@ -57,7 +56,6 @@ brew update --force
 
 brew bundle --file=- <<EOF
 # AI tooling
-cask "claude"
 cask "claude-code"
 
 # Browser -- one-time OAuth flows (Claude login, MCP auth) done over Screen
@@ -71,12 +69,12 @@ brew "openssl"
 brew "shellcheck"
 brew "jq"
 brew "htop"
-brew "ripgrep"
+brew "the_silver_searcher"
 brew "tmux"
 brew "vim"
 brew "zsh"
 brew "gh"
-brew "nodenv"
+brew "mise"
 
 # Remote access
 brew "tailscale"
@@ -84,16 +82,19 @@ EOF
 
 brew upgrade
 
-# Configure nodenv and install latest Node.js LTS
-if command -v nodenv > /dev/null 2>&1; then
-  echo "Setting up nodenv and Node.js ..."
+# Node.js via mise -- mono-node (the primary repo this box will work in)
+# standardizes on mise over nvm/nodenv, pinning versions per-repo via
+# mise.toml/.nvmrc. `mise use --global` just sets the fallback used outside
+# any pinned repo.
+if command -v mise > /dev/null 2>&1; then
+  echo "Setting up mise and Node.js ..."
+  mise use --global node@lts
+  echo "Node.js LTS set as global default via mise"
 
-  # Node.js LTS releases use even-numbered major versions
-  latest_lts=$(nodenv install -l 2>/dev/null | sed 's/^[[:space:]]*//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | awk -F. '$1 % 2 == 0' | tail -1)
-  if [ -n "$latest_lts" ]; then
-    nodenv install -s "$latest_lts"
-    nodenv global "$latest_lts"
-    echo "Node.js $latest_lts set as global default"
+  ZPROFILE="$HOME/.zprofile.local"
+  if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
+    # shellcheck disable=SC2016
+    printf '\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
   fi
 
   # Shell init (.zshrc) is managed by dotfiles - do not modify
@@ -137,11 +138,14 @@ sudo brew services start tailscale
 # Power management -- tuned for an unattended box                            #
 ###############################################################################
 
-# Wake on network access (lets SSH/Tailscale wake it if it does sleep) and
-# auto-restart after a power failure -- important for a box tucked away with
-# no one around to press the power button. Actual sleep *prevention* with the
-# lid closed is intentionally left to Amphetamine (see summary) rather than
-# scripted here with pmset disablesleep.
+# Prevent system sleep entirely (independent of the display, which stays off
+# with the lid closed) -- this is what actually keeps a lid-closed MacBook
+# reachable, no third-party keep-awake app needed. Also wake on network
+# access (lets SSH/Tailscale wake it if it ever does sleep) and auto-restart
+# after a power failure -- important for a box tucked away with no one
+# around to press the power button. Trade-off: no idle power savings, which
+# is the point for an always-on automation box.
+sudo pmset -a disablesleep 1
 sudo pmset -a womp 1
 sudo pmset -a autorestart 1
 
@@ -186,52 +190,6 @@ done
 echo "macOS defaults configured."
 
 ###############################################################################
-# Scheduled jobs -- scaffolding only, no job installed yet                   #
-###############################################################################
-
-JOBS_DIR="$HOME/.laptop/jobs"
-mkdir -p "$JOBS_DIR"
-
-JOBS_README="$JOBS_DIR/README.md"
-if [ ! -f "$JOBS_README" ]; then
-  cat > "$JOBS_README" <<'EOF'
-# Scheduled jobs
-
-Convention for adding a recurring job to this box: a script here, plus a
-LaunchAgent that runs it on an interval. Follow the idempotent load pattern
-used by mac-openclaw's `poke-messages` agent (unload-then-reload, since
-`bootstrap` errors if the label is already loaded):
-
-    JOB_PLIST="$HOME/Library/LaunchAgents/com.user.<job-name>.plist"
-
-    cat > "$JOB_PLIST" <<PLIST
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    <plist version="1.0">
-    <dict>
-        <key>Label</key>
-        <string>com.user.<job-name></string>
-        <key>RunAtLoad</key>
-        <true/>
-        <key>StartInterval</key>
-        <integer>300</integer>
-        <key>ProgramArguments</key>
-        <array>
-            <string>$HOME/.laptop/jobs/<job-name>.sh</string>
-        </array>
-    </dict>
-    </plist>
-    PLIST
-
-    launchctl bootout "gui/$(id -u)/com.user.<job-name>" 2>/dev/null || true
-    launchctl bootstrap "gui/$(id -u)" "$JOB_PLIST"
-
-Use `StartCalendarInterval` instead of `StartInterval` for clock-time (rather
-than every-N-seconds) schedules.
-EOF
-fi
-
-###############################################################################
 # TODO.md -- manual steps with live status                                   #
 ###############################################################################
 
@@ -257,8 +215,6 @@ _Last updated: $_GENERATED — rerun mac-headless to refresh status._
 - [$_GIT] Set git identity: \`git config --global user.name "Name" && git config --global user.email "you@example.com"\`
 - [$_GH] Authenticate GitHub CLI: \`gh auth login\`
 - [$_AUTOLOGIN] Enable automatic login (survives unattended reboots): System Settings -> Users & Groups -> Login Options -> Automatic login. Not scripted here since it requires storing your account password.
-- [ ] Install & configure Amphetamine (or similar) from the App Store to keep the machine awake with the lid closed -- pmset alone won't prevent clamshell sleep on a MacBook with no external display
-- [ ] Add scheduled jobs under \`~/.laptop/jobs\` as needed (see \`~/.laptop/jobs/README.md\` for the LaunchAgent pattern)
 EOF
 
 ###############################################################################
@@ -278,6 +234,5 @@ echo ""
 echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
 echo ""
-echo "Reminder: install Amphetamine to keep this box awake with the lid closed."
 echo "Manual steps: $TODO_FILE"
 echo "============================================================"
