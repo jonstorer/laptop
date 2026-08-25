@@ -14,6 +14,7 @@ Support For:
 
 * macOS (Apple Silicon) — `mac-agentic`
 * macOS (Apple Silicon or Intel x86_64) — `mac-openclaw`
+* macOS (Apple Silicon) — `mac-headless`
 * macOS (Intel x86_64) — `mac-x86_64`
 * Ubuntu 20.04+ — `ubuntu`
 * Ubuntu 26.04 LTS Desktop (amd64) — `ubuntu-openclaw`
@@ -42,6 +43,14 @@ Sets up a Mac as an iMessage bridge for a ubuntu-openclaw installation. BlueBubb
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-openclaw' | sh
+```
+
+#### Mac — Headless Devbox (Apple Silicon)
+
+Sets up a MacBook Pro to run lid-closed, screen-off, as a Claude Code automation box: MCP-connected agent work (e.g. Jira cleanup) now, general dev work later. Reachable via SSH, Screen Sharing, and Tailscale.
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-headless' | sh
 ```
 
 #### Mac — Intel (x86_64)
@@ -138,6 +147,30 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 Sets zsh as the default shell and applies macOS defaults optimized for autonomous/headless operation.
 
 Writes a `TODO.md` to the working directory with live status checks for each manual step.
+
+#### Mac — Headless Devbox (Apple Silicon)
+
+Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
+
+**Casks:** claude, claude-code, google-chrome
+
+**CLI tools:** git, gnupg, openssl, shellcheck, jq, htop, ripgrep, tmux, vim, zsh, gh, nodenv, tailscale
+
+**Node.js:** nodenv installs the latest LTS (even-numbered major version) and sets it as the global default.
+
+**SSH:** Remote Login enabled for remote access.
+
+**Screen Sharing:** enabled for remote desktop — the fallback for interactive steps (browser OAuth for Claude/MCP login) since the box has no physical display.
+
+**Tailscale:** installed and daemon started; run `sudo tailscale up` to authenticate.
+
+**Power management:** `pmset` tuned for unattended operation (wake on network access, auto-restart after power failure). Actual sleep prevention with the lid closed is left to an app like Amphetamine, not scripted.
+
+**Scheduled jobs:** `~/.laptop/jobs` is created with a `README.md` documenting the LaunchAgent pattern for adding recurring jobs later — no job is installed by default.
+
+Sets zsh as the default shell and applies the automation-friendly subset of macOS defaults (no confirmation dialogs, no iCloud doc sync, no Time Machine new-disk prompts).
+
+Writes a `TODO.md` to `$HOME` with live status checks for each manual step (Claude auth, Atlassian MCP, Tailscale auth, git identity, gh auth, automatic login, Amphetamine).
 
 #### Mac — Intel (x86_64)
 

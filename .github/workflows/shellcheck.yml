@@ -14,4 +14,4 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get install -y shellcheck
       - name: ShellCheck
-        run: shellcheck ubuntu-openclaw ubuntu pi mac-agentic mac-openclaw mac-x86_64
+        run: shellcheck ubuntu-openclaw ubuntu pi mac-agentic mac-openclaw mac-headless mac-x86_64

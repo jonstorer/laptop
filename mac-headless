@@ -1,0 +1,283 @@
+#!/bin/sh
+
+# Welcome to the mac-headless machine script!
+# Sets up a headless MacBook Pro (Apple Silicon, lid closed, screen off) as a
+# Claude Code automation box: MCP-connected agent work now (e.g. Jira
+# cleanup), general dev work later. Reachable via SSH / Screen Sharing /
+# Tailscale, tuned to survive reboots and stay out of the way of unattended
+# automation. Actual sleep prevention with the lid closed is left to
+# Amphetamine (or similar) -- see the summary at the end.
+# After this script completes, follow the manual steps shown in the summary.
+
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
+
+# Keep using sudo so the permissions don't time out
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
+
+# Run logging -- append one tab-separated line per run to ~/.laptop/runs.log so
+# it's easy to see which script ran on which host, when, for how long, against
+# which repo commit, and whether it succeeded. The commit is fetched lazily at
+# exit (via curl or wget) and falls back to "unknown" when offline or unset.
+LAPTOP_SCRIPT="mac-headless"
+LAPTOP_RUN_START=$(date +%s)
+
+log_run() {
+  _ret="$1"
+  _dur=$(( $(date +%s) - LAPTOP_RUN_START ))
+  if [ "$_ret" -eq 0 ]; then _outcome="ok"; else _outcome="fail"; fi
+  _api="https://api.github.com/repos/jonstorer/laptop/commits/main"
+  _commit=$( { curl -fsSL "$_api" 2>/dev/null || wget -qO- "$_api" 2>/dev/null; } \
+    | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-12)
+  [ -n "$_commit" ] || _commit="unknown"
+  mkdir -p "$HOME/.laptop"
+  printf '%s\t%s\t%s\t%s\t%s\t%ss\texit=%s\n' \
+    "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+    "$LAPTOP_SCRIPT" "$(hostname)" "$_commit" \
+    "$_outcome" "$_dur" "$_ret" >> "$HOME/.laptop/runs.log"
+}
+
+# shellcheck disable=SC2154
+trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+set -e
+
+###############################################################################
+# Homebrew                                                                    #
+###############################################################################
+
+if ! command -v brew > /dev/null 2>&1; then
+  echo "Installing Homebrew ..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+fi
+
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+echo "Updating Homebrew ..."
+brew update --force
+
+brew bundle --file=- <<EOF
+# AI tooling
+cask "claude"
+cask "claude-code"
+
+# Browser -- one-time OAuth flows (Claude login, MCP auth) done over Screen
+# Sharing since there's no physical display
+cask "google-chrome"
+
+# Libraries & tools
+brew "git"
+brew "gnupg"
+brew "openssl"
+brew "shellcheck"
+brew "jq"
+brew "htop"
+brew "ripgrep"
+brew "tmux"
+brew "vim"
+brew "zsh"
+brew "gh"
+brew "nodenv"
+
+# Remote access
+brew "tailscale"
+EOF
+
+brew upgrade
+
+# Configure nodenv and install latest Node.js LTS
+if command -v nodenv > /dev/null 2>&1; then
+  echo "Setting up nodenv and Node.js ..."
+
+  # Node.js LTS releases use even-numbered major versions
+  latest_lts=$(nodenv install -l 2>/dev/null | sed 's/^[[:space:]]*//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | awk -F. '$1 % 2 == 0' | tail -1)
+  if [ -n "$latest_lts" ]; then
+    nodenv install -s "$latest_lts"
+    nodenv global "$latest_lts"
+    echo "Node.js $latest_lts set as global default"
+  fi
+
+  # Shell init (.zshrc) is managed by dotfiles - do not modify
+fi
+
+###############################################################################
+# zsh                                                                         #
+###############################################################################
+
+shell_path="$(command -v zsh)"
+echo "Ensuring default shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+if [ "$SHELL" != "$shell_path" ]; then
+  sudo chsh -s "$shell_path" "$USER"
+fi
+
+###############################################################################
+# SSH -- enable Remote Login for remote access                               #
+###############################################################################
+
+pgrep sshd > /dev/null 2>&1 || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+
+###############################################################################
+# Screen Sharing -- enable for remote desktop (needed for interactive OAuth  #
+# steps, since the box has no physical display)                              #
+###############################################################################
+
+nc -z localhost 5900 2>/dev/null || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+
+###############################################################################
+# Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
+###############################################################################
+
+sudo brew services start tailscale
+
+###############################################################################
+# Power management -- tuned for an unattended box                            #
+###############################################################################
+
+# Wake on network access (lets SSH/Tailscale wake it if it does sleep) and
+# auto-restart after a power failure -- important for a box tucked away with
+# no one around to press the power button. Actual sleep *prevention* with the
+# lid closed is intentionally left to Amphetamine (see summary) rather than
+# scripted here with pmset disablesleep.
+sudo pmset -a womp 1
+sudo pmset -a autorestart 1
+
+###############################################################################
+# macOS defaults -- automation-friendly only                                 #
+###############################################################################
+
+echo "Configuring macOS defaults ..."
+
+# Keep background processes alive
+defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
+
+# No iCloud document syncing
+defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
+
+# Reveal IP address, hostname, OS version when clicking clock in login window
+sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
+
+# Locale
+defaults write NSGlobalDomain AppleLanguages -array "en"
+defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
+defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+
+# Require password immediately after screensaver
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
+
+# No .DS_Store on network volumes
+defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
+
+# No confirmation dialogs that could block automation
+defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
+defaults write com.apple.finder WarnOnEmptyTrash -bool false
+
+# Don't prompt to use new disks for Time Machine backups
+sudo defaults write /Library/Preferences/com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
+
+for app in "Dock" "Finder" "SystemUIServer"; do
+  killall "$app" > /dev/null 2>&1 || true
+done
+
+echo "macOS defaults configured."
+
+###############################################################################
+# Scheduled jobs -- scaffolding only, no job installed yet                   #
+###############################################################################
+
+JOBS_DIR="$HOME/.laptop/jobs"
+mkdir -p "$JOBS_DIR"
+
+JOBS_README="$JOBS_DIR/README.md"
+if [ ! -f "$JOBS_README" ]; then
+  cat > "$JOBS_README" <<'EOF'
+# Scheduled jobs
+
+Convention for adding a recurring job to this box: a script here, plus a
+LaunchAgent that runs it on an interval. Follow the idempotent load pattern
+used by mac-openclaw's `poke-messages` agent (unload-then-reload, since
+`bootstrap` errors if the label is already loaded):
+
+    JOB_PLIST="$HOME/Library/LaunchAgents/com.user.<job-name>.plist"
+
+    cat > "$JOB_PLIST" <<PLIST
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+        <key>Label</key>
+        <string>com.user.<job-name></string>
+        <key>RunAtLoad</key>
+        <true/>
+        <key>StartInterval</key>
+        <integer>300</integer>
+        <key>ProgramArguments</key>
+        <array>
+            <string>$HOME/.laptop/jobs/<job-name>.sh</string>
+        </array>
+    </dict>
+    </plist>
+    PLIST
+
+    launchctl bootout "gui/$(id -u)/com.user.<job-name>" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$JOB_PLIST"
+
+Use `StartCalendarInterval` instead of `StartInterval` for clock-time (rather
+than every-N-seconds) schedules.
+EOF
+fi
+
+###############################################################################
+# TODO.md -- manual steps with live status                                   #
+###############################################################################
+
+_ok() { sh -c "$1" > /dev/null 2>&1 && printf 'x' || printf ' '; }
+
+_CLAUDE=$(_ok "claude auth status")
+_MCP=$(_ok "claude mcp list | grep -qi atlassian")
+_TS=$(_ok "tailscale status")
+_GIT=$(_ok "git config --global user.name | grep -q . && git config --global user.email | grep -q .")
+_GH=$(_ok "gh auth status")
+_AUTOLOGIN=$(_ok "sudo defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser")
+_GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
+TODO_FILE="$HOME/TODO.md"
+
+cat > "$TODO_FILE" <<EOF
+# Mac Headless Devbox Setup
+
+_Last updated: $_GENERATED — rerun mac-headless to refresh status._
+
+- [$_CLAUDE] Authenticate Claude CLI: \`claude\` (interactive TTY required -- use SSH or Screen Sharing)
+- [$_MCP] Add the Atlassian MCP for Jira cleanup: \`claude mcp add --transport sse atlassian https://mcp.atlassian.com/v1/sse\` then authenticate (opens a browser -- use Screen Sharing/Chrome)
+- [$_TS] Authenticate Tailscale: \`sudo tailscale up\`
+- [$_GIT] Set git identity: \`git config --global user.name "Name" && git config --global user.email "you@example.com"\`
+- [$_GH] Authenticate GitHub CLI: \`gh auth login\`
+- [$_AUTOLOGIN] Enable automatic login (survives unattended reboots): System Settings -> Users & Groups -> Login Options -> Automatic login. Not scripted here since it requires storing your account password.
+- [ ] Install & configure Amphetamine (or similar) from the App Store to keep the machine awake with the lid closed -- pmset alone won't prevent clamshell sleep on a MacBook with no external display
+- [ ] Add scheduled jobs under \`~/.laptop/jobs\` as needed (see \`~/.laptop/jobs/README.md\` for the LaunchAgent pattern)
+EOF
+
+###############################################################################
+# Summary                                                                     #
+###############################################################################
+
+LOCAL_IP="$(ipconfig getifaddr en0 2>/dev/null || echo 'unknown')"
+
+echo ""
+echo "============================================================"
+echo "Setup complete. This Mac is a headless Claude Code devbox."
+echo ""
+echo "Local IP:        $LOCAL_IP"
+echo "SSH:              ssh $USER@$LOCAL_IP"
+echo "Screen Sharing:   vnc://$LOCAL_IP"
+echo ""
+echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
+echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
+echo ""
+echo "Reminder: install Amphetamine to keep this box awake with the lid closed."
+echo "Manual steps: $TODO_FILE"
+echo "============================================================"
