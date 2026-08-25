@@ -168,7 +168,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
 Sets zsh as the default shell and applies the automation-friendly subset of macOS defaults (no confirmation dialogs, no iCloud doc sync, no Time Machine new-disk prompts).
 
-Writes a `TODO.md` to `$HOME` with live status checks for each manual step (Claude auth, Atlassian MCP, Tailscale auth, git identity, gh auth), plus notes on keeping automatic login off and the LaunchDaemon pattern for background work that should start without any login session.
+Writes a `TODO.md` to `$HOME` with live status checks for each manual step (Claude auth, Atlassian MCP, Tailscale auth, git identity, gh auth).
 
 #### Mac — Intel (x86_64)
 
