@@ -40,6 +40,14 @@ log_run() {
 trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
 
+# Run with LAPTOP_DEBUG=1 for full command tracing -- helpful when testing
+# on a new machine (e.g. a VM) and diagnosing exactly where a failure
+# happened, since set -e otherwise exits silently with no indication of
+# which command failed beyond its own error output.
+[ -n "${LAPTOP_DEBUG:-}" ] && set -x
+
+echo "macOS: $(sw_vers -productVersion 2>/dev/null || echo unknown), arch: $(uname -m)"
+
 ###############################################################################
 # Homebrew                                                                    #
 ###############################################################################
@@ -89,7 +97,7 @@ brew upgrade
 if command -v mise > /dev/null 2>&1; then
   echo "Setting up mise and Node.js ..."
   mise use --global node@lts
-  echo "Node.js LTS set as global default via mise"
+  echo "Node.js LTS set as global default via mise: $(mise exec node -- node -v 2>/dev/null || echo 'unable to verify')"
 
   ZPROFILE="$HOME/.zprofile.local"
   if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
@@ -117,6 +125,7 @@ fi
 # SSH -- enable Remote Login for remote access                               #
 ###############################################################################
 
+echo "Enabling SSH Remote Login ..."
 pgrep sshd > /dev/null 2>&1 || \
   sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
 
@@ -125,6 +134,7 @@ pgrep sshd > /dev/null 2>&1 || \
 # steps, since the box has no physical display)                              #
 ###############################################################################
 
+echo "Enabling Screen Sharing ..."
 nc -z localhost 5900 2>/dev/null || \
   sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
 
@@ -132,6 +142,7 @@ nc -z localhost 5900 2>/dev/null || \
 # Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
 ###############################################################################
 
+echo "Starting Tailscale daemon ..."
 sudo brew services start tailscale
 
 ###############################################################################
@@ -145,6 +156,7 @@ sudo brew services start tailscale
 # after a power failure -- important for a box tucked away with no one
 # around to press the power button. Trade-off: no idle power savings, which
 # is the point for an always-on automation box.
+echo "Tuning pmset for unattended operation ..."
 sudo pmset -a disablesleep 1
 sudo pmset -a womp 1
 sudo pmset -a autorestart 1
