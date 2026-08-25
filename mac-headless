@@ -200,7 +200,6 @@ _MCP=$(_ok "claude mcp list | grep -qi atlassian")
 _TS=$(_ok "tailscale status")
 _GIT=$(_ok "git config --global user.name | grep -q . && git config --global user.email | grep -q .")
 _GH=$(_ok "gh auth status")
-_AUTOLOGIN=$(_ok "sudo defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser")
 _GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
 TODO_FILE="$HOME/TODO.md"
 
@@ -214,7 +213,8 @@ _Last updated: $_GENERATED — rerun mac-headless to refresh status._
 - [$_TS] Authenticate Tailscale: \`sudo tailscale up\`
 - [$_GIT] Set git identity: \`git config --global user.name "Name" && git config --global user.email "you@example.com"\`
 - [$_GH] Authenticate GitHub CLI: \`gh auth login\`
-- [$_AUTOLOGIN] Enable automatic login (survives unattended reboots): System Settings -> Users & Groups -> Login Options -> Automatic login. Not scripted here since it requires storing your account password.
+- [ ] Do NOT enable automatic login (System Settings -> Users & Groups -> Login Options) -- opening the lid should always require a password, never show an unlocked desktop
+- [ ] For background work (Claude, scheduled jobs) to run at boot without any GUI/SSH login ever happening, use a LaunchDaemon with \`UserName\` set to run as you (in /Library/LaunchDaemons, loaded at the system level) rather than a LaunchAgent, which needs a login session first. Before relying on this: verify whether Claude's stored credentials need your login Keychain unlocked (GUI login) to be read -- a LaunchDaemon started before any login may not be able to authenticate. Also check whether FileVault is enabled: if so, a full reboot stops at the pre-boot disk-unlock screen and nothing (not even the LaunchDaemon) starts until someone is physically there to unlock it.
 EOF
 
 ###############################################################################
