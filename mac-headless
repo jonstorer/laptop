@@ -200,9 +200,6 @@ defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
 defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
 defaults write com.apple.finder WarnOnEmptyTrash -bool false
 
-# Don't prompt to use new disks for Time Machine backups
-sudo defaults write /Library/Preferences/com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true 2>/dev/null || true
-
 for app in "Dock" "Finder" "SystemUIServer"; do
   killall "$app" > /dev/null 2>&1 || true
 done
