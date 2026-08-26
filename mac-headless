@@ -70,16 +70,27 @@ cask "claude-code"
 # Sharing since there's no physical display
 cask "google-chrome"
 
+# GUI apps -- for occasional Screen Sharing sessions
+cask "alfred"
+cask "iterm2"
+cask "rectangle"
+cask "textmate"
+
 # Libraries & tools
+brew "curl"
+brew "forego"
 brew "git"
 brew "gnupg"
 brew "openssl"
 brew "shellcheck"
 brew "jq"
+brew "yq"
 brew "htop"
 brew "the_silver_searcher"
+brew "tmate"
 brew "tmux"
 brew "vim"
+brew "wget"
 brew "zsh"
 brew "gh"
 brew "mise"

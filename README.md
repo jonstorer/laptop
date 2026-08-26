@@ -152,15 +152,15 @@ Writes a `TODO.md` to the working directory with live status checks for each man
 
 Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
-**Casks:** claude-code, google-chrome
+**Casks:** claude-code, google-chrome, alfred, iterm2, rectangle, textmate
 
-**CLI tools:** git, gnupg, openssl, shellcheck, jq, htop, the_silver_searcher, tmux, vim, zsh, gh, mise, tailscale
+**CLI tools:** curl, forego, git, gnupg, openssl, shellcheck, jq, yq, htop, the_silver_searcher, tmate, tmux, vim, wget, zsh, gh, mise, tailscale
 
 **Node.js:** [mise](https://mise.jdx.dev) sets a global LTS default; per-repo pinned versions (e.g. mono-node's `mise.toml`/`.nvmrc`) take over automatically when you `cd` in.
 
 **SSH:** Remote Login enabled for remote access.
 
-**Screen Sharing:** enabled for remote desktop — the fallback for interactive steps (browser OAuth for Claude/MCP login) since the box has no physical display.
+**Screen Sharing:** enabled for remote desktop — the fallback for interactive steps (browser OAuth for Claude/MCP login, or just working on the box directly with Alfred/iTerm2/Rectangle/TextMate) since the box has no physical display.
 
 **Tailscale:** installed and daemon started; run `sudo tailscale up` to authenticate.
 
