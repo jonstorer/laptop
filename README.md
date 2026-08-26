@@ -164,7 +164,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
 **Tailscale:** installed and daemon started; run `sudo tailscale up` to authenticate.
 
-**Power management:** `pmset` tuned for unattended operation — `disablesleep` keeps the system awake independent of the display (which stays off with the lid closed), plus wake-on-network-access and auto-restart-after-power-failure. No third-party keep-awake app needed.
+**Power management:** `pmset` tuned for unattended operation — `disablesleep` keeps the system awake independent of the display (which stays off with the lid closed), plus wake-on-network-access and auto-restart-after-power-failure.
 
 Sets zsh as the default shell and applies the automation-friendly subset of macOS defaults (no confirmation dialogs, no iCloud doc sync, no Time Machine new-disk prompts).
 

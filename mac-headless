@@ -101,8 +101,8 @@ EOF
 
 brew upgrade
 
-# Node.js via mise -- mono-node (the primary repo this box will work in)
-# standardizes on mise over nvm/nodenv, pinning versions per-repo via
+# Node.js via mise -- matches mono-node's (the primary repo this box will
+# work in) own toolchain convention, pinning versions per-repo via
 # mise.toml/.nvmrc. `mise use --global` just sets the fallback used outside
 # any pinned repo.
 if command -v mise > /dev/null 2>&1; then
@@ -161,12 +161,11 @@ sudo brew services start tailscale
 ###############################################################################
 
 # Prevent system sleep entirely (independent of the display, which stays off
-# with the lid closed) -- this is what actually keeps a lid-closed MacBook
-# reachable, no third-party keep-awake app needed. Also wake on network
-# access (lets SSH/Tailscale wake it if it ever does sleep) and auto-restart
-# after a power failure -- important for a box tucked away with no one
-# around to press the power button. Trade-off: no idle power savings, which
-# is the point for an always-on automation box.
+# with the lid closed) -- this is what keeps a lid-closed MacBook reachable.
+# Also wake on network access (lets SSH/Tailscale wake it if it ever does
+# sleep) and auto-restart after a power failure -- important for a box
+# tucked away with no one around to press the power button. Trade-off: no
+# idle power savings, which is the point for an always-on automation box.
 echo "Tuning pmset for unattended operation ..."
 sudo pmset -a disablesleep 1
 sudo pmset -a womp 1
