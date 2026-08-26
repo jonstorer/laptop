@@ -54,7 +54,7 @@ echo "macOS: $(sw_vers -productVersion 2>/dev/null || echo unknown), arch: $(una
 ###############################################################################
 
 echo "Syncing system clock ..."
-sudo sntp -sS time.apple.com 2>/dev/null || true
+sudo sntp -sS time.apple.com > /dev/null 2>&1 || true
 
 ###############################################################################
 # Homebrew                                                                    #
@@ -144,7 +144,8 @@ fi
 ###############################################################################
 
 echo "Enabling SSH Remote Login ..."
-sudo systemsetup -setremotelogin on
+sudo systemsetup -setremotelogin on 2>/dev/null || \
+  echo "Could not enable Remote Login -- see TODO.md (needs Full Disk Access)."
 
 ###############################################################################
 # Screen Sharing -- enable for remote desktop (needed for interactive OAuth  #
@@ -222,6 +223,7 @@ _ok() { sh -c "$1" > /dev/null 2>&1 && printf 'x' || printf ' '; }
 
 _CLAUDE=$(_ok "claude auth status")
 _MCP=$(_ok "claude mcp list | grep -qi atlassian")
+_SSH=$(_ok "sudo systemsetup -getremotelogin 2>/dev/null | grep -qi 'On'")
 _TS=$(_ok "tailscale status")
 _GIT=$(_ok "git config --global user.name | grep -q . && git config --global user.email | grep -q .")
 _GH=$(_ok "gh auth status")
@@ -235,6 +237,7 @@ _Last updated: $_GENERATED — rerun mac-headless to refresh status._
 
 - [$_CLAUDE] Authenticate Claude CLI: \`claude\` (interactive TTY required -- use SSH or Screen Sharing)
 - [$_MCP] Add the Atlassian MCP for Jira cleanup: \`claude mcp add --transport sse atlassian https://mcp.atlassian.com/v1/sse\` then authenticate (opens a browser -- use Screen Sharing/Chrome)
+- [$_SSH] Enable SSH Remote Login: grant Full Disk Access to this terminal app (System Settings -> Privacy & Security -> Full Disk Access), then run \`sudo systemsetup -setremotelogin on\` (or re-run this script) -- macOS won't allow this from a script without it
 - [$_TS] Authenticate Tailscale: \`sudo tailscale up\`
 - [$_GIT] Set git identity: \`git config --global user.name "Name" && git config --global user.email "you@example.com"\`
 - [$_GH] Authenticate GitHub CLI: \`gh auth login\`

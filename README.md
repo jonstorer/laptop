@@ -158,7 +158,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
 **Node.js:** [mise](https://mise.jdx.dev) sets a global LTS default; per-repo pinned versions (`mise.toml`/`.nvmrc`) take over automatically when you `cd` in.
 
-**SSH:** Remote Login enabled for remote access.
+**SSH:** attempts to enable Remote Login via `systemsetup`; macOS requires Full Disk Access for the terminal running the script to actually allow this, so it's also a live-checked manual step in `TODO.md` if it doesn't take.
 
 **Screen Sharing:** enabled for remote desktop — the fallback for interactive steps (browser OAuth for Claude/MCP login, or just working on the box directly with Alfred/iTerm2/Rectangle/TextMate) since the box has no physical display.
 
