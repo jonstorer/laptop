@@ -156,7 +156,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
 
 **CLI tools:** curl, forego, git, gnupg, openssl, shellcheck, jq, yq, htop, the_silver_searcher, tmate, tmux, vim, wget, zsh, gh, mise, tailscale
 
-**Node.js:** [mise](https://mise.jdx.dev) sets a global LTS default; per-repo pinned versions (e.g. mono-node's `mise.toml`/`.nvmrc`) take over automatically when you `cd` in.
+**Node.js:** [mise](https://mise.jdx.dev) sets a global LTS default; per-repo pinned versions (`mise.toml`/`.nvmrc`) take over automatically when you `cd` in.
 
 **SSH:** Remote Login enabled for remote access.
 
