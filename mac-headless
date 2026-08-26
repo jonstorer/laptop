@@ -49,6 +49,14 @@ set -e
 echo "macOS: $(sw_vers -productVersion 2>/dev/null || echo unknown), arch: $(uname -m)"
 
 ###############################################################################
+# Time sync -- clock skew breaks TLS verification for softwareupdate, which  #
+# Homebrew's installer uses to fetch the Xcode Command Line Tools           #
+###############################################################################
+
+echo "Syncing system clock ..."
+sudo sntp -sS time.apple.com 2>/dev/null || true
+
+###############################################################################
 # Homebrew                                                                    #
 ###############################################################################
 
