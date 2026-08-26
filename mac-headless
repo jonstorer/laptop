@@ -136,8 +136,7 @@ fi
 ###############################################################################
 
 echo "Enabling SSH Remote Login ..."
-pgrep sshd > /dev/null 2>&1 || \
-  sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+sudo systemsetup -setremotelogin on
 
 ###############################################################################
 # Screen Sharing -- enable for remote desktop (needed for interactive OAuth  #
@@ -202,7 +201,7 @@ defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
 defaults write com.apple.finder WarnOnEmptyTrash -bool false
 
 # Don't prompt to use new disks for Time Machine backups
-sudo defaults write /Library/Preferences/com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
+sudo defaults write /Library/Preferences/com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true 2>/dev/null || true
 
 for app in "Dock" "Finder" "SystemUIServer"; do
   killall "$app" > /dev/null 2>&1 || true
