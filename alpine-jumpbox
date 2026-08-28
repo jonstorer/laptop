@@ -62,15 +62,10 @@ fi
 $SUDO apk update
 
 # shellcheck disable=SC2086
-$SUDO apk add openssh tailscale tailscale-openrc ca-certificates doas
-
-# No mDNS on this box -- it's reached by Tailscale IP.
-if apk info -e avahi >/dev/null 2>&1; then
-  echo "Warning: avahi is installed but not required by this script; not removing it." >&2
-fi
+$SUDO apk add openssh tailscale tailscale-openrc ca-certificates doas avahi
 
 # Enable and start services via OpenRC.
-for svc in sshd tailscale; do
+for svc in sshd tailscale avahi-daemon; do
   if ! rc-update show default 2>/dev/null | grep -q "^ *${svc} *|"; then
     # shellcheck disable=SC2086
     $SUDO rc-update add "$svc" default
@@ -80,6 +75,18 @@ for svc in sshd tailscale; do
     $SUDO rc-service "$svc" start
   fi
 done
+
+# mDNS via Avahi -- reachable at <hostname>.local from the Mac (Bonjour needs
+# no config there), same as the macOS VM this replaces.
+avahi_conf="/etc/avahi/avahi-daemon.conf"
+new_host_line="host-name=$(cat /etc/hostname)"
+if ! grep -qxF "$new_host_line" "$avahi_conf"; then
+  # shellcheck disable=SC2086
+  $SUDO sed -i '/^host-name=/d' "$avahi_conf"
+  echo "$new_host_line" | $SUDO tee -a "$avahi_conf" >/dev/null
+  # shellcheck disable=SC2086
+  $SUDO rc-service avahi-daemon restart
+fi
 
 # Create the login user (fresh off `setup-alpine -q`, only root exists yet)
 # and let it escalate via doas -- adduser -D leaves the account passwordless,

@@ -81,9 +81,10 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 #### Alpine Jumpbox
 
-Headless Tailscale relay VM (ProxyJump target only, no other workloads). Run as root right after
-`setup-alpine -q` on a fresh install. Run this in a real terminal, not in the background — it walks you
-through Tailscale login interactively. See "What it sets up" below for details.
+Headless Tailscale relay VM (ProxyJump target only, no other workloads), reachable by Tailscale IP or by
+`<hostname>.local` on the LAN. Run as root right after `setup-alpine -q` on a fresh install. Run this in a
+real terminal, not in the background — it walks you through Tailscale login interactively. See "What it
+sets up" below for details.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/alpine-jumpbox' | sh
@@ -194,13 +195,19 @@ Same as Ubuntu plus **headless setup**: enables and starts the SSH service and c
 
 #### Alpine Jumpbox
 
-Headless Alpine Linux relay box: `tailscaled` and `sshd` as OpenRC boot services, no login session and no
-mDNS required. Picks up right after `setup-alpine -q` on a fresh install, where only root exists yet.
+Headless Alpine Linux relay box: `tailscaled`, `sshd`, and `avahi-daemon` as OpenRC boot services, no
+login session required. Picks up right after `setup-alpine -q` on a fresh install, where only root exists
+yet.
 
-**Packages:** openssh, tailscale, tailscale-openrc, ca-certificates, doas (via the `community` apk repo,
-enabled automatically if not already). No avahi/mDNS, no desktop packages.
+**Packages:** openssh, tailscale, tailscale-openrc, ca-certificates, doas, avahi (via the `community` apk
+repo, enabled automatically if not already). No desktop packages.
 
-**Services:** `sshd` and `tailscale` added to the `default` OpenRC runlevel and started immediately.
+**Services:** `sshd`, `tailscale`, and `avahi-daemon` added to the `default` OpenRC runlevel and started
+immediately.
+
+**mDNS:** Avahi is configured with `host-name` matching `/etc/hostname`, so the box is reachable at
+`<hostname>.local` from the Mac with no extra config there (Bonjour resolves it automatically) — same as
+the macOS VM this replaces.
 
 **User:** creates `LAPTOP_SSH_USER` (default `jumpbox`) with `adduser -D` if it doesn't exist yet,
 adds it to `wheel`, and configures `doas` to let `wheel` escalate without a password (the account has none).
