@@ -98,6 +98,14 @@ if ! id "$jumpbox_user" >/dev/null 2>&1; then
   $SUDO addgroup "$jumpbox_user" wheel
 fi
 
+# adduser -D locks the password ("!" in /etc/shadow), and sshd refuses to
+# authenticate a locked account at all -- even via pubkey. Swap to "*", which
+# is just as unusable as a password but isn't treated as locked.
+if grep -q "^${jumpbox_user}:!" /etc/shadow; then
+  # shellcheck disable=SC2086
+  $SUDO sed -i -E "s|^(${jumpbox_user}):![^:]*:|\1:*:|" /etc/shadow
+fi
+
 # shellcheck disable=SC2086
 $SUDO mkdir -p /etc/doas.d
 if ! grep -qs '^permit nopass :wheel$' /etc/doas.d/doas.conf; then
