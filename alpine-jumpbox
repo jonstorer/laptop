@@ -82,8 +82,7 @@ avahi_conf="/etc/avahi/avahi-daemon.conf"
 new_host_line="host-name=$(cat /etc/hostname)"
 if ! grep -qxF "$new_host_line" "$avahi_conf"; then
   # shellcheck disable=SC2086
-  $SUDO sed -i '/^host-name=/d' "$avahi_conf"
-  echo "$new_host_line" | $SUDO tee -a "$avahi_conf" >/dev/null
+  $SUDO sed -i -e '/^host-name=/d' -e "/^\[server\]/a $new_host_line" "$avahi_conf"
   # shellcheck disable=SC2086
   $SUDO rc-service avahi-daemon restart
 fi
