@@ -113,14 +113,18 @@ $SUDO chmod 700 "$ssh_dir"
 # shellcheck disable=SC2086
 $SUDO chmod 600 "$auth_keys"
 
-# Prompt for a key when none is on file yet. Reads from /dev/tty since this
+default_pubkey="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEvadfIkdsxO2zZm0Nkv8wAojLustJ/3Wh3xELuIp3M7 jonathon@Jonathon-Storer-NYC"
+
+# Fill in a key when none is on file yet. Reads from /dev/tty since this
 # script is normally run via curl|sh, which occupies stdin.
-if [ ! -s "$auth_keys" ] && [ -r /dev/tty ]; then
-  echo "Paste the SSH public key for $jumpbox_user (or press Enter to skip):"
-  read -r pubkey < /dev/tty
-  if [ -n "$pubkey" ]; then
-    printf '%s\n' "$pubkey" | $SUDO tee -a "$auth_keys" >/dev/null
+if [ ! -s "$auth_keys" ]; then
+  pubkey="$default_pubkey"
+  if [ -r /dev/tty ]; then
+    echo "Paste an SSH public key for $jumpbox_user (or press Enter to use the default jonathon@Jonathon-Storer-NYC key):"
+    read -r input_key < /dev/tty
+    [ -z "$input_key" ] || pubkey="$input_key"
   fi
+  printf '%s\n' "$pubkey" | $SUDO tee -a "$auth_keys" >/dev/null
 fi
 
 drop_in="/etc/ssh/sshd_config.d/99-jumpbox.conf"
