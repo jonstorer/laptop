@@ -114,7 +114,7 @@ $SUDO chmod 700 "$ssh_dir"
 $SUDO chmod 600 "$auth_keys"
 
 if [ ! -s "$auth_keys" ]; then
-  printf '%s\n' "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEvadfIkdsxO2zZm0Nkv8wAojLustJ/3Wh3xELuIp3M7 jonathon@Jonathon-Storer-NYC" \
+  printf '%s\n' "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEvadfIkdsxO2zZm0Nkv8wAojLustJ/3Wh3xELuIp3M7" \
     | $SUDO tee -a "$auth_keys" >/dev/null
 fi
 
