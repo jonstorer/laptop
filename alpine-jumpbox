@@ -62,7 +62,7 @@ fi
 $SUDO apk update
 
 # shellcheck disable=SC2086
-$SUDO apk add openssh openssh-server-openrc tailscale tailscale-openrc ca-certificates
+$SUDO apk add openssh tailscale tailscale-openrc ca-certificates doas
 
 # No mDNS on this box -- it's reached by Tailscale IP.
 if apk info -e avahi >/dev/null 2>&1; then
@@ -81,13 +81,23 @@ for svc in sshd tailscale; do
   fi
 done
 
-# Prepare (but never overwrite) authorized_keys for the jumpbox user so a key
-# can be pasted in manually -- this script does not fetch or generate one.
+# Create the login user (fresh off `setup-alpine -q`, only root exists yet)
+# and let it escalate via doas -- adduser -D leaves the account passwordless,
+# so doas is configured to not prompt for one.
 jumpbox_user="${LAPTOP_SSH_USER:-jonathonstorer}"
 if ! id "$jumpbox_user" >/dev/null 2>&1; then
-  echo "User '$jumpbox_user' does not exist. Create it (or set LAPTOP_SSH_USER) and re-run." >&2
-  exit 1
+  # shellcheck disable=SC2086
+  $SUDO adduser -D -s /bin/ash "$jumpbox_user"
+  # shellcheck disable=SC2086
+  $SUDO addgroup "$jumpbox_user" wheel
 fi
+
+# shellcheck disable=SC2086
+$SUDO mkdir -p /etc/doas.d
+if ! grep -qs '^permit nopass :wheel$' /etc/doas.d/doas.conf; then
+  echo 'permit nopass :wheel' | $SUDO tee -a /etc/doas.d/doas.conf >/dev/null
+fi
+
 user_home=$(getent passwd "$jumpbox_user" | cut -d: -f6)
 ssh_dir="$user_home/.ssh"
 auth_keys="$ssh_dir/authorized_keys"

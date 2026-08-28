@@ -81,9 +81,10 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 #### Alpine Jumpbox
 
-Headless Tailscale relay VM (ProxyJump target only, no other workloads). Run this in a real terminal, not
-`curl | sh` in the background — it prompts for your SSH public key and walks you through Tailscale login
-interactively. See "What it sets up" below for details.
+Headless Tailscale relay VM (ProxyJump target only, no other workloads). Run as root right after
+`setup-alpine -q` on a fresh install. Run this in a real terminal, not in the background — it prompts for
+your SSH public key and walks you through Tailscale login interactively. See "What it sets up" below for
+details.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/alpine-jumpbox' | sh
@@ -195,16 +196,19 @@ Same as Ubuntu plus **headless setup**: enables and starts the SSH service and c
 #### Alpine Jumpbox
 
 Headless Alpine Linux relay box: `tailscaled` and `sshd` as OpenRC boot services, no login session and no
-mDNS required.
+mDNS required. Picks up right after `setup-alpine -q` on a fresh install, where only root exists yet.
 
-**Packages:** openssh, openssh-server-openrc, tailscale, tailscale-openrc, ca-certificates (via the
-`community` apk repo, enabled automatically if not already). No avahi/mDNS, no desktop packages.
+**Packages:** openssh, tailscale, tailscale-openrc, ca-certificates, doas (via the `community` apk repo,
+enabled automatically if not already). No avahi/mDNS, no desktop packages.
 
 **Services:** `sshd` and `tailscale` added to the `default` OpenRC runlevel and started immediately.
 
-**SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) for `LAPTOP_SSH_USER` (default
-`jonathonstorer`) if it doesn't exist. If it's still empty, the script prompts you to paste a public key in
-(read from `/dev/tty`, so this works even when piped via `curl | sh`); an existing file is never overwritten.
+**User:** creates `LAPTOP_SSH_USER` (default `jonathonstorer`) with `adduser -D` if it doesn't exist yet,
+adds it to `wheel`, and configures `doas` to let `wheel` escalate without a password (the account has none).
+
+**SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) if it doesn't exist. If it's still empty,
+the script prompts you to paste a public key in (read from `/dev/tty`, so this works even when piped via
+`curl | sh`); an existing file is never overwritten.
 
 **SSH hardening:** disables password auth (pubkey only, no root login) unconditionally via a drop-in at
 `/etc/ssh/sshd_config.d/99-jumpbox.conf`.
