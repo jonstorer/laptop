@@ -84,7 +84,7 @@ done
 # Create the login user (fresh off `setup-alpine -q`, only root exists yet)
 # and let it escalate via doas -- adduser -D leaves the account passwordless,
 # so doas is configured to not prompt for one.
-jumpbox_user="${LAPTOP_SSH_USER:-jonathonstorer}"
+jumpbox_user="${LAPTOP_SSH_USER:-jumpbox}"
 if ! id "$jumpbox_user" >/dev/null 2>&1; then
   # shellcheck disable=SC2086
   $SUDO adduser -D -s /bin/ash "$jumpbox_user"

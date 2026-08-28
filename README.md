@@ -203,7 +203,7 @@ enabled automatically if not already). No avahi/mDNS, no desktop packages.
 
 **Services:** `sshd` and `tailscale` added to the `default` OpenRC runlevel and started immediately.
 
-**User:** creates `LAPTOP_SSH_USER` (default `jonathonstorer`) with `adduser -D` if it doesn't exist yet,
+**User:** creates `LAPTOP_SSH_USER` (default `jumpbox`) with `adduser -D` if it doesn't exist yet,
 adds it to `wheel`, and configures `doas` to let `wheel` escalate without a password (the account has none).
 
 **SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) if it doesn't exist. If it's still empty,
