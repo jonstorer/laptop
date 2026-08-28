@@ -18,6 +18,7 @@ Support For:
 * Ubuntu 20.04+ — `ubuntu`
 * Ubuntu 26.04 LTS Desktop (amd64) — `ubuntu-openclaw`
 * Raspberry Pi (Ubuntu-based)
+* Alpine Linux 3.24+ (aarch64/amd64) — `alpine-jumpbox`
 * Windows 11
 
 Older versions may work but aren't regularly tested.
@@ -76,6 +77,16 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/pi' | sh
+```
+
+#### Alpine Jumpbox
+
+Headless Tailscale relay VM (ProxyJump target only, no other workloads). See "What it sets up" below —
+sshd hardening only kicks in once you've pasted a public key into `authorized_keys`, and `tailscale up`
+is left to you to run with your own auth key.
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/alpine-jumpbox' | sh
 ```
 
 #### Windows (two steps required)
@@ -180,6 +191,27 @@ Standalone [OpenClaw](https://openclaw.ai) machine on Ubuntu 26.04 LTS Desktop (
 #### Raspberry Pi
 
 Same as Ubuntu plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 (persisted via netfilter-persistent) so you can access the Pi remotely.
+
+#### Alpine Jumpbox
+
+Headless Alpine Linux relay box: `tailscaled` and `sshd` as OpenRC boot services, no login session and no
+mDNS required.
+
+**Packages:** openssh, openssh-server-openrc, tailscale, tailscale-openrc, ca-certificates (via the
+`community` apk repo, enabled automatically if not already). No avahi/mDNS, no desktop packages.
+
+**Services:** `sshd` and `tailscale` added to the `default` OpenRC runlevel and started immediately.
+
+**SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) for `LAPTOP_SSH_USER` (default
+`jonathonstorer`) if it doesn't exist, but never overwrites it — paste your public key in yourself.
+
+**SSH hardening:** disables password auth (pubkey only, no root login) via a drop-in at
+`/etc/ssh/sshd_config.d/99-jumpbox.conf`, but only once `authorized_keys` is non-empty — otherwise it
+prints instructions and leaves sshd alone so you can't lock yourself out of a headless VM.
+
+**Tailscale:** installed and enabled, but `tailscale up` is left to you (headless boxes need an auth key,
+not interactive browser auth). The script prints the exact command to run and, once authenticated, prints
+the Tailscale IP plus a ready-to-paste `~/.ssh/config` block for use as a `ProxyJump` target.
 
 #### Windows (two steps)
 
