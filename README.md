@@ -81,9 +81,9 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 #### Alpine Jumpbox
 
-Headless Tailscale relay VM (ProxyJump target only, no other workloads). See "What it sets up" below —
-password auth is disabled unconditionally, so paste a public key into `authorized_keys` before or right
-after running this. `tailscale up` is left to you to run with your own auth key.
+Headless Tailscale relay VM (ProxyJump target only, no other workloads). Run this in a real terminal, not
+`curl | sh` in the background — it prompts for your SSH public key and walks you through Tailscale login
+interactively. See "What it sets up" below for details.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/alpine-jumpbox' | sh
@@ -203,15 +203,16 @@ mDNS required.
 **Services:** `sshd` and `tailscale` added to the `default` OpenRC runlevel and started immediately.
 
 **SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) for `LAPTOP_SSH_USER` (default
-`jonathonstorer`) if it doesn't exist, but never overwrites it — paste your public key in yourself.
+`jonathonstorer`) if it doesn't exist. If it's still empty, the script prompts you to paste a public key in
+(read from `/dev/tty`, so this works even when piped via `curl | sh`); an existing file is never overwritten.
 
 **SSH hardening:** disables password auth (pubkey only, no root login) unconditionally via a drop-in at
-`/etc/ssh/sshd_config.d/99-jumpbox.conf`. If `authorized_keys` is still empty when this runs, the script
-warns you to paste a key in before disconnecting.
+`/etc/ssh/sshd_config.d/99-jumpbox.conf`.
 
-**Tailscale:** installed and enabled, but `tailscale up` is left to you (headless boxes need an auth key,
-not interactive browser auth). The script prints the exact command to run and, once authenticated, prints
-the Tailscale IP plus a ready-to-paste `~/.ssh/config` block for use as a `ProxyJump` target.
+**Tailscale:** installed and enabled. If not already authenticated, the script runs `tailscale up`
+interactively — Tailscale has no username/password login, so this prints a URL for browser-based SSO and
+waits for you to complete it there. Once authenticated, it prints the Tailscale IP plus a ready-to-paste
+`~/.ssh/config` block for use as a `ProxyJump` target.
 
 #### Windows (two steps)
 

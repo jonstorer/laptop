@@ -103,6 +103,16 @@ $SUDO chmod 700 "$ssh_dir"
 # shellcheck disable=SC2086
 $SUDO chmod 600 "$auth_keys"
 
+# Prompt for a key when none is on file yet. Reads from /dev/tty since this
+# script is normally run via curl|sh, which occupies stdin.
+if [ ! -s "$auth_keys" ] && [ -r /dev/tty ]; then
+  echo "Paste the SSH public key for $jumpbox_user (or press Enter to skip):"
+  read -r pubkey < /dev/tty
+  if [ -n "$pubkey" ]; then
+    printf '%s\n' "$pubkey" | $SUDO tee -a "$auth_keys" >/dev/null
+  fi
+fi
+
 drop_in="/etc/ssh/sshd_config.d/99-jumpbox.conf"
 sshd_config="/etc/ssh/sshd_config"
 
@@ -143,9 +153,16 @@ fi
 echo ""
 if tailscale_ip=$(tailscale ip -4 2>/dev/null) && [ -n "$tailscale_ip" ]; then
   echo "Tailscale is up. IP: $tailscale_ip"
+elif [ -r /dev/tty ]; then
+  # Tailscale has no username/password login -- `tailscale up` prints a URL
+  # for browser-based SSO and blocks here until you finish it there.
+  echo "Starting Tailscale login -- open the URL below to authenticate:"
+  # shellcheck disable=SC2086
+  $SUDO tailscale up --hostname=jumpbox < /dev/tty
+  tailscale_ip=$(tailscale ip -4 2>/dev/null) || tailscale_ip="<new-alpine-tailscale-ip>"
 else
   echo "Tailscale is not authenticated yet. Run:"
-  echo "  $SUDO tailscale up --auth-key=tskey-... --hostname=jumpbox"
+  echo "  $SUDO tailscale up --hostname=jumpbox"
   echo "then re-run this script (or run 'tailscale ip -4') to get the IP."
   tailscale_ip="<new-alpine-tailscale-ip>"
 fi
