@@ -82,8 +82,8 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 #### Alpine Jumpbox
 
 Headless Tailscale relay VM (ProxyJump target only, no other workloads). See "What it sets up" below —
-sshd hardening only kicks in once you've pasted a public key into `authorized_keys`, and `tailscale up`
-is left to you to run with your own auth key.
+password auth is disabled unconditionally, so paste a public key into `authorized_keys` before or right
+after running this. `tailscale up` is left to you to run with your own auth key.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/alpine-jumpbox' | sh
@@ -205,9 +205,9 @@ mDNS required.
 **SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) for `LAPTOP_SSH_USER` (default
 `jonathonstorer`) if it doesn't exist, but never overwrites it — paste your public key in yourself.
 
-**SSH hardening:** disables password auth (pubkey only, no root login) via a drop-in at
-`/etc/ssh/sshd_config.d/99-jumpbox.conf`, but only once `authorized_keys` is non-empty — otherwise it
-prints instructions and leaves sshd alone so you can't lock yourself out of a headless VM.
+**SSH hardening:** disables password auth (pubkey only, no root login) unconditionally via a drop-in at
+`/etc/ssh/sshd_config.d/99-jumpbox.conf`. If `authorized_keys` is still empty when this runs, the script
+warns you to paste a key in before disconnecting.
 
 **Tailscale:** installed and enabled, but `tailscale up` is left to you (headless boxes need an auth key,
 not interactive browser auth). The script prints the exact command to run and, once authenticated, prints

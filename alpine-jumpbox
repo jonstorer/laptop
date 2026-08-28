@@ -103,18 +103,15 @@ $SUDO chmod 700 "$ssh_dir"
 # shellcheck disable=SC2086
 $SUDO chmod 600 "$auth_keys"
 
-# Only harden sshd once a key is actually in place -- disabling password auth
-# on a headless VM with no key configured means console-only recovery.
-if [ -s "$auth_keys" ]; then
-  drop_in="/etc/ssh/sshd_config.d/99-jumpbox.conf"
-  sshd_config="/etc/ssh/sshd_config"
+drop_in="/etc/ssh/sshd_config.d/99-jumpbox.conf"
+sshd_config="/etc/ssh/sshd_config"
 
-  if ! grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' "$sshd_config" 2>/dev/null; then
-    # shellcheck disable=SC2086
-    $SUDO sh -c "printf 'Include /etc/ssh/sshd_config.d/*.conf\n' | cat - $sshd_config > ${sshd_config}.new && mv ${sshd_config}.new $sshd_config"
-  fi
+if ! grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' "$sshd_config" 2>/dev/null; then
+  # shellcheck disable=SC2086
+  $SUDO sh -c "printf 'Include /etc/ssh/sshd_config.d/*.conf\n' | cat - $sshd_config > ${sshd_config}.new && mv ${sshd_config}.new $sshd_config"
+fi
 
-  new_drop_in=$(cat <<'EOF'
+new_drop_in=$(cat <<'EOF'
 PasswordAuthentication no
 PubkeyAuthentication yes
 KbdInteractiveAuthentication no
@@ -123,30 +120,24 @@ AllowTcpForwarding yes
 X11Forwarding no
 EOF
 )
-  old_drop_in=""
-  [ -f "$drop_in" ] && old_drop_in=$(cat "$drop_in")
+old_drop_in=""
+[ -f "$drop_in" ] && old_drop_in=$(cat "$drop_in")
 
-  if [ "$new_drop_in" != "$old_drop_in" ]; then
-    # shellcheck disable=SC2086
-    $SUDO mkdir -p "$(dirname "$drop_in")"
-    printf '%s\n' "$new_drop_in" | $SUDO tee "$drop_in" >/dev/null
-    # shellcheck disable=SC2086
-    $SUDO sshd -t
-    # shellcheck disable=SC2086
-    $SUDO rc-service sshd restart
-  fi
-  ssh_hardened=1
-else
-  ssh_hardened=0
+if [ "$new_drop_in" != "$old_drop_in" ]; then
+  # shellcheck disable=SC2086
+  $SUDO mkdir -p "$(dirname "$drop_in")"
+  printf '%s\n' "$new_drop_in" | $SUDO tee "$drop_in" >/dev/null
+  # shellcheck disable=SC2086
+  $SUDO sshd -t
+  # shellcheck disable=SC2086
+  $SUDO rc-service sshd restart
 fi
 
 echo ""
 echo "== alpine-jumpbox setup summary =="
-if [ "$ssh_hardened" -eq 1 ]; then
-  echo "sshd hardened: password auth disabled, pubkey only."
-else
-  echo "sshd NOT hardened yet -- $auth_keys is empty."
-  echo "Paste your public key into that file, then re-run this script."
+echo "sshd hardened: password auth disabled, pubkey only."
+if [ ! -s "$auth_keys" ]; then
+  echo "Note: $auth_keys is still empty -- paste your public key in before you disconnect."
 fi
 
 echo ""
