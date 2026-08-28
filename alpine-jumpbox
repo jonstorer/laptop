@@ -69,7 +69,7 @@ if apk info -e avahi >/dev/null 2>&1; then
   echo "Warning: avahi is installed but not required by this script; not removing it." >&2
 fi
 
-# Enable and start services via OpenRC (not systemd -- this is Alpine).
+# Enable and start services via OpenRC.
 for svc in sshd tailscale; do
   if ! rc-update show default 2>/dev/null | grep -q "^ *${svc} *|"; then
     # shellcheck disable=SC2086
