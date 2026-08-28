@@ -82,9 +82,8 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 #### Alpine Jumpbox
 
 Headless Tailscale relay VM (ProxyJump target only, no other workloads). Run as root right after
-`setup-alpine -q` on a fresh install. Run this in a real terminal, not in the background — it prompts for
-your SSH public key and walks you through Tailscale login interactively. See "What it sets up" below for
-details.
+`setup-alpine -q` on a fresh install. Run this in a real terminal, not in the background — it walks you
+through Tailscale login interactively. See "What it sets up" below for details.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/alpine-jumpbox' | sh
@@ -206,9 +205,8 @@ enabled automatically if not already). No avahi/mDNS, no desktop packages.
 **User:** creates `LAPTOP_SSH_USER` (default `jumpbox`) with `adduser -D` if it doesn't exist yet,
 adds it to `wheel`, and configures `doas` to let `wheel` escalate without a password (the account has none).
 
-**SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) if it doesn't exist. If it's still empty,
-the script prompts you to paste a public key in (read from `/dev/tty`, so this works even when piped via
-`curl | sh`); an existing file is never overwritten.
+**SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) if it doesn't exist, seeded with
+jonathon's public key; an existing file is never overwritten.
 
 **SSH hardening:** disables password auth (pubkey only, no root login) unconditionally via a drop-in at
 `/etc/ssh/sshd_config.d/99-jumpbox.conf`.
