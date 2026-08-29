@@ -19,6 +19,7 @@ Support For:
 * Ubuntu 26.04 LTS Desktop (amd64) — `ubuntu-openclaw`
 * Raspberry Pi (Ubuntu-based)
 * Alpine Linux 3.24+ (aarch64/amd64) — `alpine-jumpbox`
+* Debian 12+ (aarch64/amd64) — `debian-jumpbox`
 * Windows 11
 
 Older versions may work but aren't regularly tested.
@@ -88,6 +89,16 @@ sets up" below for details.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/alpine-jumpbox' | sh
+```
+
+#### Debian Jumpbox
+
+Same purpose as the Alpine jumpbox above, on Debian instead. Run as root on a fresh minimal install. Run
+this in a real terminal, not in the background — it walks you through Tailscale login interactively. See
+"What it sets up" below for details.
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/debian-jumpbox' | sh
 ```
 
 #### Windows (two steps required)
@@ -222,6 +233,32 @@ jonathon's public key; an existing file is never overwritten.
 interactively — Tailscale has no username/password login, so this prints a URL for browser-based SSO and
 waits for you to complete it there. Once authenticated, it prints the Tailscale IP plus a ready-to-paste
 `~/.ssh/config` block for use as a `ProxyJump` target.
+
+#### Debian Jumpbox
+
+Same setup as the Alpine jumpbox, on Debian: `ssh`, `tailscaled`, and `avahi-daemon` as systemd services,
+no login session required.
+
+**Packages:** openssh-server, avahi-daemon, ca-certificates, curl, gnupg, sudo (apt). Tailscale via its
+official install script (`tailscale.com/install.sh`), skipped if already installed. No desktop packages.
+
+**Services:** `ssh`, `tailscaled`, and `avahi-daemon` enabled and started via `systemctl enable --now`.
+
+**mDNS:** same Avahi `host-name` config as the Alpine version — reachable at `<hostname>.local` from the
+Mac with no extra config there.
+
+**User:** creates `LAPTOP_SSH_USER` (default `jumpbox`) with `useradd -m` if it doesn't exist yet, adds it
+to the `sudo` group, and drops a NOPASSWD sudoers.d entry for that group (validated with `visudo -cf`
+before being trusted) since the account has no password.
+
+**SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) if it doesn't exist, seeded with
+jonathon's public key; an existing file is never overwritten.
+
+**SSH hardening:** disables password auth (pubkey only, no root login) unconditionally via a drop-in at
+`/etc/ssh/sshd_config.d/99-jumpbox.conf`.
+
+**Tailscale:** same interactive `tailscale up` flow as the Alpine version — prints a URL for browser-based
+SSO, then the Tailscale IP plus a ready-to-paste `~/.ssh/config` block.
 
 #### Windows (two steps)
 
