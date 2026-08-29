@@ -1,0 +1,192 @@
+#!/bin/sh
+
+# Welcome to the debian jumpbox setup script!
+#
+# Headless Debian Tailscale relay box (ProxyJump target only). Runs
+# tailscaled and sshd via systemd with no user logged in.
+
+set -e
+
+# Run logging -- append one tab-separated line per run to ~/.laptop/runs.log so
+# it's easy to see which script ran on which host, when, for how long, against
+# which repo commit, and whether it succeeded. The commit is fetched lazily at
+# exit (via curl or wget) and falls back to "unknown" when offline or unset.
+LAPTOP_SCRIPT="debian-jumpbox"
+LAPTOP_RUN_START=$(date +%s)
+
+log_run() {
+  _ret="$1"
+  _dur=$(( $(date +%s) - LAPTOP_RUN_START ))
+  if [ "$_ret" -eq 0 ]; then _outcome="ok"; else _outcome="fail"; fi
+  _api="https://api.github.com/repos/jonstorer/laptop/commits/main"
+  _commit=$( { curl -fsSL "$_api" 2>/dev/null || wget -qO- "$_api" 2>/dev/null; } \
+    | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-12)
+  [ -n "$_commit" ] || _commit="unknown"
+  mkdir -p "$HOME/.laptop"
+  printf '%s\t%s\t%s\t%s\t%s\t%ss\texit=%s\n' \
+    "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+    "$LAPTOP_SCRIPT" "$(hostname)" "$_commit" \
+    "$_outcome" "$_dur" "$_ret" >> "$HOME/.laptop/runs.log"
+}
+
+# shellcheck disable=SC2154
+trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+
+# Privilege helper -- a fresh minimal Debian install may not have sudo set up
+# for a non-root user yet. Run as-is when already root, otherwise use sudo.
+if [ "$(id -u)" -eq 0 ]; then
+  SUDO=""
+elif command -v sudo >/dev/null 2>&1; then
+  SUDO="sudo"
+else
+  echo "Run this script as root, or install sudo first." >&2
+  exit 1
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+# shellcheck disable=SC2086
+$SUDO apt-get update
+
+# shellcheck disable=SC2086
+$SUDO apt-get install -y openssh-server avahi-daemon ca-certificates curl gnupg sudo
+
+# Tailscale isn't in Debian's default repos -- the official installer adds
+# its apt repo and key, then installs the package. Skip re-running it once
+# the package is already present.
+if ! command -v tailscale >/dev/null 2>&1; then
+  curl -fsSL https://tailscale.com/install.sh | $SUDO sh
+fi
+
+# Enable and start services via systemd. enable --now is idempotent: a no-op
+# if already enabled/running.
+for svc in ssh tailscaled avahi-daemon; do
+  # shellcheck disable=SC2086
+  $SUDO systemctl enable --now "$svc"
+done
+
+# mDNS via Avahi -- reachable at <hostname>.local from the Mac (Bonjour needs
+# no config there), same as the macOS VM this replaces.
+avahi_conf="/etc/avahi/avahi-daemon.conf"
+new_host_line="host-name=$(cat /etc/hostname)"
+if ! grep -qxF "$new_host_line" "$avahi_conf"; then
+  # shellcheck disable=SC2086
+  $SUDO sed -i -e '/^host-name=/d' -e "/^\[server\]/a $new_host_line" "$avahi_conf"
+  # shellcheck disable=SC2086
+  $SUDO systemctl restart avahi-daemon
+fi
+
+# Create the login user and let it escalate via sudo (NOPASSWD, since the
+# account itself has no password).
+jumpbox_user="${LAPTOP_SSH_USER:-jumpbox}"
+if ! id "$jumpbox_user" >/dev/null 2>&1; then
+  # shellcheck disable=SC2086
+  $SUDO useradd -m -s /bin/bash "$jumpbox_user"
+fi
+# shellcheck disable=SC2086
+$SUDO usermod -aG sudo "$jumpbox_user"
+
+# useradd -m locks the password ("!" in /etc/shadow), and sshd can refuse to
+# authenticate a locked account at all -- even via pubkey. Swap to "*", which
+# is just as unusable as a password but isn't treated as locked.
+if grep -q "^${jumpbox_user}:!" /etc/shadow; then
+  # shellcheck disable=SC2086
+  $SUDO usermod -p '*' "$jumpbox_user"
+fi
+
+sudoers_file="/etc/sudoers.d/jumpbox"
+sudoers_line="%sudo ALL=(ALL:ALL) NOPASSWD:ALL"
+if [ ! -f "$sudoers_file" ] || ! grep -qxF "$sudoers_line" "$sudoers_file"; then
+  echo "$sudoers_line" | $SUDO tee "$sudoers_file" >/dev/null
+  # shellcheck disable=SC2086
+  $SUDO chmod 440 "$sudoers_file"
+  # shellcheck disable=SC2086
+  $SUDO visudo -cf "$sudoers_file"
+fi
+
+user_home=$(getent passwd "$jumpbox_user" | cut -d: -f6)
+ssh_dir="$user_home/.ssh"
+auth_keys="$ssh_dir/authorized_keys"
+
+# shellcheck disable=SC2086
+$SUDO mkdir -p "$ssh_dir"
+# shellcheck disable=SC2086
+[ -f "$auth_keys" ] || $SUDO sh -c "touch $auth_keys"
+# shellcheck disable=SC2086
+$SUDO chown -R "$jumpbox_user:$jumpbox_user" "$ssh_dir"
+# shellcheck disable=SC2086
+$SUDO chmod 700 "$ssh_dir"
+# shellcheck disable=SC2086
+$SUDO chmod 600 "$auth_keys"
+
+if [ ! -s "$auth_keys" ]; then
+  printf '%s\n' "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEvadfIkdsxO2zZm0Nkv8wAojLustJ/3Wh3xELuIp3M7" \
+    | $SUDO tee -a "$auth_keys" >/dev/null
+fi
+
+drop_in="/etc/ssh/sshd_config.d/99-jumpbox.conf"
+sshd_config="/etc/ssh/sshd_config"
+
+if ! grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' "$sshd_config" 2>/dev/null; then
+  # shellcheck disable=SC2086
+  $SUDO sh -c "printf 'Include /etc/ssh/sshd_config.d/*.conf\n' | cat - $sshd_config > ${sshd_config}.new && mv ${sshd_config}.new $sshd_config"
+fi
+
+new_drop_in=$(cat <<'EOF'
+PasswordAuthentication no
+PubkeyAuthentication yes
+KbdInteractiveAuthentication no
+PermitRootLogin no
+AllowTcpForwarding yes
+X11Forwarding no
+EOF
+)
+old_drop_in=""
+[ -f "$drop_in" ] && old_drop_in=$(cat "$drop_in")
+
+if [ "$new_drop_in" != "$old_drop_in" ]; then
+  # shellcheck disable=SC2086
+  $SUDO mkdir -p "$(dirname "$drop_in")"
+  printf '%s\n' "$new_drop_in" | $SUDO tee "$drop_in" >/dev/null
+  # shellcheck disable=SC2086
+  $SUDO sshd -t
+  # shellcheck disable=SC2086
+  $SUDO systemctl restart ssh
+fi
+
+echo ""
+echo "== debian-jumpbox setup summary =="
+echo "sshd hardened: password auth disabled, pubkey only."
+if [ ! -s "$auth_keys" ]; then
+  echo "Note: $auth_keys is still empty -- paste your public key in before you disconnect."
+fi
+
+echo ""
+if tailscale_ip=$(tailscale ip -4 2>/dev/null) && [ -n "$tailscale_ip" ]; then
+  echo "Tailscale is up. IP: $tailscale_ip"
+elif [ -r /dev/tty ]; then
+  # Tailscale has no username/password login -- `tailscale up` prints a URL
+  # for browser-based SSO and blocks here until you finish it there.
+  echo "Starting Tailscale login -- open the URL below to authenticate:"
+  # shellcheck disable=SC2086
+  $SUDO tailscale up --hostname=jumpbox < /dev/tty
+  tailscale_ip=$(tailscale ip -4 2>/dev/null) || tailscale_ip="<new-debian-tailscale-ip>"
+else
+  echo "Tailscale is not authenticated yet. Run:"
+  echo "  $SUDO tailscale up --hostname=jumpbox"
+  echo "then re-run this script (or run 'tailscale ip -4') to get the IP."
+  tailscale_ip="<new-debian-tailscale-ip>"
+fi
+
+echo ""
+echo "Drop this into ~/.ssh/config on your Mac:"
+echo ""
+echo "Host jumpbox"
+echo "  User $jumpbox_user"
+echo "  HostName $tailscale_ip"
+echo "  IdentityFile ~/.ssh/personal_id_ed25519"
+echo "  IdentitiesOnly yes"
+echo "  PreferredAuthentications publickey"
+echo "  ControlMaster auto"
+echo "  ControlPath ~/.ssh/cm-%C"
+echo "  ControlPersist 10m"
