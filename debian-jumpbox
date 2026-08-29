@@ -87,9 +87,8 @@ fi
 $SUDO usermod -aG sudo "$jumpbox_user"
 
 # useradd -m locks the password ("!" in /etc/shadow), and sshd can refuse to
-# authenticate a locked account at all -- even via pubkey (hit this on the
-# Alpine version of this script). Swap to "*", which is just as unusable as
-# a password but isn't treated as locked.
+# authenticate a locked account at all -- even via pubkey. Swap to "*", which
+# is just as unusable as a password but isn't treated as locked.
 if grep -q "^${jumpbox_user}:!" /etc/shadow; then
   # shellcheck disable=SC2086
   $SUDO usermod -p '*' "$jumpbox_user"
