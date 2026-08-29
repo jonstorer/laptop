@@ -18,7 +18,6 @@ Support For:
 * Ubuntu 20.04+ — `ubuntu`
 * Ubuntu 26.04 LTS Desktop (amd64) — `ubuntu-openclaw`
 * Raspberry Pi (Ubuntu-based)
-* Alpine Linux 3.24+ (aarch64/amd64) — `alpine-jumpbox`
 * Debian 12+ (aarch64/amd64) — `debian-jumpbox`
 * Windows 11
 
@@ -80,22 +79,12 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/pi' | sh
 ```
 
-#### Alpine Jumpbox
-
-Headless Tailscale relay VM (ProxyJump target only, no other workloads), reachable by Tailscale IP or by
-`<hostname>.local` on the LAN. Run as root right after `setup-alpine -q` on a fresh install. Run this in a
-real terminal, not in the background — it walks you through Tailscale login interactively. See "What it
-sets up" below for details.
-
-```sh
-curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/alpine-jumpbox' | sh
-```
-
 #### Debian Jumpbox
 
-Same purpose as the Alpine jumpbox above, on Debian instead. Run as root on a fresh minimal install. Run
-this in a real terminal, not in the background — it walks you through Tailscale login interactively. See
-"What it sets up" below for details.
+Headless Tailscale relay VM (ProxyJump target only, no other workloads), reachable by Tailscale IP or by
+`<hostname>.local` on the LAN. Run as root on a fresh minimal install. Run this in a real terminal, not in
+the background — it walks you through Tailscale login interactively. See "What it sets up" below for
+details.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/debian-jumpbox' | sh
@@ -204,48 +193,19 @@ Standalone [OpenClaw](https://openclaw.ai) machine on Ubuntu 26.04 LTS Desktop (
 
 Same as Ubuntu plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 (persisted via netfilter-persistent) so you can access the Pi remotely.
 
-#### Alpine Jumpbox
-
-Headless Alpine Linux relay box: `tailscaled`, `sshd`, and `avahi-daemon` as OpenRC boot services, no
-login session required. Picks up right after `setup-alpine -q` on a fresh install, where only root exists
-yet.
-
-**Packages:** openssh, tailscale, tailscale-openrc, ca-certificates, doas, avahi (via the `community` apk
-repo, enabled automatically if not already). No desktop packages.
-
-**Services:** `sshd`, `tailscale`, and `avahi-daemon` added to the `default` OpenRC runlevel and started
-immediately.
-
-**mDNS:** Avahi is configured with `host-name` matching `/etc/hostname`, so the box is reachable at
-`<hostname>.local` from the Mac with no extra config there (Bonjour resolves it automatically) — same as
-the macOS VM this replaces.
-
-**User:** creates `LAPTOP_SSH_USER` (default `jumpbox`) with `adduser -D` if it doesn't exist yet,
-adds it to `wheel`, and configures `doas` to let `wheel` escalate without a password (the account has none).
-
-**SSH keys:** creates `~<user>/.ssh/authorized_keys` (mode 600) if it doesn't exist, seeded with
-jonathon's public key; an existing file is never overwritten.
-
-**SSH hardening:** disables password auth (pubkey only, no root login) unconditionally via a drop-in at
-`/etc/ssh/sshd_config.d/99-jumpbox.conf`.
-
-**Tailscale:** installed and enabled. If not already authenticated, the script runs `tailscale up`
-interactively — Tailscale has no username/password login, so this prints a URL for browser-based SSO and
-waits for you to complete it there. Once authenticated, it prints the Tailscale IP plus a ready-to-paste
-`~/.ssh/config` block for use as a `ProxyJump` target.
-
 #### Debian Jumpbox
 
-Same setup as the Alpine jumpbox, on Debian: `ssh`, `tailscaled`, and `avahi-daemon` as systemd services,
-no login session required.
+Headless Debian relay box: `ssh`, `tailscaled`, and `avahi-daemon` as systemd services, no login session
+required.
 
 **Packages:** openssh-server, avahi-daemon, ca-certificates, curl, gnupg, sudo (apt). Tailscale via its
 official install script (`tailscale.com/install.sh`), skipped if already installed. No desktop packages.
 
 **Services:** `ssh`, `tailscaled`, and `avahi-daemon` enabled and started via `systemctl enable --now`.
 
-**mDNS:** same Avahi `host-name` config as the Alpine version — reachable at `<hostname>.local` from the
-Mac with no extra config there.
+**mDNS:** Avahi is configured with `host-name` matching `/etc/hostname`, so the box is reachable at
+`<hostname>.local` from the Mac with no extra config there (Bonjour resolves it automatically) — same as
+the macOS VM this replaces.
 
 **User:** creates `LAPTOP_SSH_USER` (default `jumpbox`) with `useradd -m` if it doesn't exist yet, adds it
 to the `sudo` group, and drops a NOPASSWD sudoers.d entry for that group (validated with `visudo -cf`
@@ -257,8 +217,10 @@ jonathon's public key; an existing file is never overwritten.
 **SSH hardening:** disables password auth (pubkey only, no root login) unconditionally via a drop-in at
 `/etc/ssh/sshd_config.d/99-jumpbox.conf`.
 
-**Tailscale:** same interactive `tailscale up` flow as the Alpine version — prints a URL for browser-based
-SSO, then the Tailscale IP plus a ready-to-paste `~/.ssh/config` block.
+**Tailscale:** installed and enabled. If not already authenticated, the script runs `tailscale up`
+interactively — Tailscale has no username/password login, so this prints a URL for browser-based SSO and
+waits for you to complete it there. Once authenticated, it prints the Tailscale IP plus a ready-to-paste
+`~/.ssh/config` block for use as a `ProxyJump` target.
 
 #### Windows (two steps)
 
