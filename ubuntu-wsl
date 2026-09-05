@@ -1,6 +1,9 @@
 #!/bin/sh
 
-# Welcome to the raspberry pi setup script!
+# Welcome to the ubuntu-wsl machine script!
+# General-purpose Ubuntu dev environment (mise, Node.js, Docker, zsh) for
+# WSL2 on Windows. Use LAPTOP_SKIP_DOCKER=1 when Docker Desktop already
+# provides Docker to the WSL guest.
 
 # Ask for sudo upfront so we don't have to get it later
 sudo -v
@@ -12,7 +15,7 @@ while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 # it's easy to see which script ran on which host, when, for how long, against
 # which repo commit, and whether it succeeded. The commit is fetched lazily at
 # exit (via curl or wget) and falls back to "unknown" when offline or unset.
-LAPTOP_SCRIPT="pi"
+LAPTOP_SCRIPT="ubuntu-wsl"
 LAPTOP_RUN_START=$(date +%s)
 
 log_run() {
@@ -37,11 +40,12 @@ set -e
 sudo apt update
 sudo apt full-upgrade
 
-sudo apt-get install -y ca-certificates curl gnupg
+sudo apt-get install -y ca-certificates gnupg wget
 
-if [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
+# Skip Docker setup when LAPTOP_SKIP_DOCKER=1 (e.g. WSL with Docker Desktop)
+if [ -z "${LAPTOP_SKIP_DOCKER}" ] && [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
   sudo install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  wget -qO- https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 # shellcheck disable=SC1091
@@ -53,20 +57,12 @@ fi
 
 sudo apt update
 
-sudo apt install -y \
-  build-essential gcc libssl-dev \
-  zsh universal-ctags git htop gh jq gnupg openssl openssh-server \
-  silversearcher-ag shellcheck tmate tmux vim watch \
-  iptables-persistent \
-  docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Headless: enable SSH for remote access
-sudo systemctl enable ssh
-sudo systemctl start ssh
-
-# Headless: allow SSH on port 22 and persist rules across reboots
-sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-sudo netfilter-persistent save
+apt_packages="build-essential gcc libssl-dev zsh universal-ctags git htop gh jq gnupg openssl openssh-server silversearcher-ag shellcheck tmate tmux vim watch"
+if [ -z "${LAPTOP_SKIP_DOCKER}" ]; then
+  apt_packages="$apt_packages docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+fi
+# shellcheck disable=SC2086
+sudo apt install -y $apt_packages
 
 # Install mise and Node.js
 export PATH="$HOME/.local/bin:$PATH"
