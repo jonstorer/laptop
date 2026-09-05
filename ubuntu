@@ -198,7 +198,10 @@ fi
 # Time sync -- clock skew breaks OAuth flows and GitHub Actions auth         #
 ###############################################################################
 
-sudo systemctl restart systemd-timesyncd
+if ! systemctl list-unit-files systemd-timesyncd.service > /dev/null 2>&1; then
+  sudo -E apt install -y systemd-timesyncd
+fi
+sudo systemctl enable --now systemd-timesyncd
 
 ###############################################################################
 # No desktop -- boot straight to a multi-user console                        #
