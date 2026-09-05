@@ -152,6 +152,41 @@ else
 fi
 
 ###############################################################################
+# Docker -- Docker CE from Docker's official apt repository                   #
+###############################################################################
+
+if ! command -v docker > /dev/null 2>&1; then
+  echo "Installing Docker ..."
+  sudo install -d -m 0755 /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    | sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
+  # shellcheck disable=SC1091
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+    | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  wait_for_apt
+  sudo -E apt update
+  sudo -E apt install -y \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io \
+    docker-buildx-plugin \
+    docker-compose-plugin
+else
+  echo "Docker already installed, skipping."
+fi
+
+sudo systemctl enable --now docker
+
+# Run docker without sudo. Group membership only takes effect in new sessions,
+# so the current shell still needs sudo until the next login.
+if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+  echo "Adding $USER to the docker group ..."
+  sudo usermod -aG docker "$USER"
+  echo "Log out and back in (or run 'newgrp docker') to use docker without sudo."
+fi
+
+###############################################################################
 # Tailscale -- official apt repository                                        #
 ###############################################################################
 

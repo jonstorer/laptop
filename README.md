@@ -201,6 +201,8 @@ Tailscale (runner install itself is a manual step — see below).
 
 **Browser:** Google Chrome stable (via Google's official apt repository) — headless browser automation for Claude Code
 
+**Docker:** Docker CE (cli, containerd, buildx, compose) via Docker's official apt repository; the service is enabled and the current user is added to the `docker` group — log out and back in (or `newgrp docker`) before running `docker` without sudo
+
 **Tailscale:** installed and enabled; run `sudo tailscale up` to authenticate
 
 **SSH:** openssh-server enabled and started; generates `~/.ssh/id_ed25519` if not present
