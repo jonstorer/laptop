@@ -1,0 +1,91 @@
+#!/bin/sh
+
+# Welcome to the ubuntu-wsl machine script!
+# General-purpose Ubuntu dev environment (asdf, Node.js, Docker, zsh) for
+# WSL2 on Windows. Use LAPTOP_SKIP_DOCKER=1 when Docker Desktop already
+# provides Docker to the WSL guest.
+
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
+
+# Keep using sudo so the permissions don't time out by updating existing sudo time stamp if set, otherwise do nothing.
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
+
+# Run logging -- append one tab-separated line per run to ~/.laptop/runs.log so
+# it's easy to see which script ran on which host, when, for how long, against
+# which repo commit, and whether it succeeded. The commit is fetched lazily at
+# exit (via curl or wget) and falls back to "unknown" when offline or unset.
+LAPTOP_SCRIPT="ubuntu-wsl"
+LAPTOP_RUN_START=$(date +%s)
+
+log_run() {
+  _ret="$1"
+  _dur=$(( $(date +%s) - LAPTOP_RUN_START ))
+  if [ "$_ret" -eq 0 ]; then _outcome="ok"; else _outcome="fail"; fi
+  _api="https://api.github.com/repos/jonstorer/laptop/commits/main"
+  _commit=$( { curl -fsSL "$_api" 2>/dev/null || wget -qO- "$_api" 2>/dev/null; } \
+    | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-12)
+  [ -n "$_commit" ] || _commit="unknown"
+  mkdir -p "$HOME/.laptop"
+  printf '%s\t%s\t%s\t%s\t%s\t%ss\texit=%s\n' \
+    "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+    "$LAPTOP_SCRIPT" "$(hostname)" "$_commit" \
+    "$_outcome" "$_dur" "$_ret" >> "$HOME/.laptop/runs.log"
+}
+
+# shellcheck disable=SC2154
+trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+set -e
+
+sudo apt update
+sudo apt full-upgrade
+
+sudo apt-get install -y ca-certificates gnupg wget
+
+# Skip Docker setup when LAPTOP_SKIP_DOCKER=1 (e.g. WSL with Docker Desktop)
+if [ -z "${LAPTOP_SKIP_DOCKER}" ] && [ ! -e "/etc/apt/keyrings/docker.gpg" ]; then
+  sudo install -m 0755 -d /etc/apt/keyrings
+  wget -qO- https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+# shellcheck disable=SC1091
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+fi
+
+sudo apt update
+
+apt_packages="build-essential gcc libssl-dev zsh universal-ctags git htop gh jq gnupg openssl openssh-server silversearcher-ag shellcheck tmate tmux vim watch"
+if [ -z "${LAPTOP_SKIP_DOCKER}" ]; then
+  apt_packages="$apt_packages docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+fi
+# shellcheck disable=SC2086
+sudo apt install -y $apt_packages
+
+# Install asdf and Node.js
+if [ ! -d "$HOME/.asdf" ]; then
+  echo "Setting up asdf and Node.js ..."
+  git clone https://github.com/asdf-vm/asdf.git "$HOME/.asdf" --branch v0.16.0
+  # shellcheck disable=SC1091
+  . "$HOME/.asdf/asdf.sh"
+
+  asdf plugin add nodejs 2>/dev/null || true
+  asdf install nodejs lts 2>/dev/null || true
+  node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
+  if [ -n "$node_version" ]; then
+    asdf set -u nodejs "$node_version"
+    echo "Node.js $node_version set as global default"
+  fi
+
+  # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
+fi
+
+shell_path="$(command -v zsh)"
+echo "Ensure shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1 ; then
+  echo "Add '$shell_path' to /etc/shells"
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+sudo chsh -s "$shell_path" "$USER"

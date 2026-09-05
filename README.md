@@ -16,8 +16,8 @@ Support For:
 * macOS (Apple Silicon or Intel x86_64) — `mac-openclaw`
 * macOS (Apple Silicon) — `mac-headless`
 * macOS (Intel x86_64) — `mac-x86_64`
-* Ubuntu 20.04+ — `ubuntu`
-* Ubuntu 26.04 LTS Desktop (amd64) — `ubuntu-openclaw`
+* Ubuntu 26.04 LTS (amd64) — `ubuntu`
+* Ubuntu (via WSL2 on Windows) — `ubuntu-wsl`
 * Raspberry Pi (Ubuntu-based)
 * Debian 12+ (aarch64/amd64) — `debian-jumpbox`
 * Windows 11
@@ -40,7 +40,7 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 #### Mac — OpenClaw iMessage Bridge (Apple Silicon or Intel x86_64)
 
-Sets up a Mac as an iMessage bridge for a ubuntu-openclaw installation. BlueBubbles exposes Messages.app via web API; ubuntu-openclaw connects via the `@openclaw/imessage` plugin over Tailscale.
+Sets up a Mac as an iMessage bridge for an OpenClaw installation. BlueBubbles exposes Messages.app via web API; OpenClaw connects via the `@openclaw/imessage` plugin over Tailscale.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-openclaw' | sh
@@ -62,24 +62,15 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 #### Ubuntu
 
+Headless Ubuntu 26.04 LTS dev box, no desktop. Two jobs: a dev environment reached over SSH (vim + Claude
+Code CLI) and a GitHub Actions self-hosted runner that deploys to another machine over Tailscale.
+
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
 ```
 or
 ```sh
 wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
-```
-
-#### Ubuntu — OpenClaw Agent
-
-Sets up Ubuntu 26.04 LTS Desktop as a complete standalone OpenClaw installation — gateway, Claude CLI backend, and WhatsApp channel. No Mac required.
-
-```sh
-wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu-openclaw' | sh
-```
-or
-```sh
-curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu-openclaw' | sh
 ```
 
 #### Raspberry Pi
@@ -112,7 +103,7 @@ This installs WSL2, Ubuntu, Chocolatey, and Windows apps. Reboot if prompted.
 **Step 2 – Ubuntu setup** (from inside WSL, e.g. run `wsl` or open Windows Terminal):
 
 ```sh
-LAPTOP_SKIP_DOCKER=1 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
+LAPTOP_SKIP_DOCKER=1 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu-wsl' | sh
 ```
 
 The `LAPTOP_SKIP_DOCKER=1` skips Docker installation (Docker Desktop provides it to WSL).
@@ -196,33 +187,39 @@ Sets zsh as the default shell and applies macOS defaults.
 
 #### Ubuntu
 
-For desktop machines (with display). Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, universal-ctags, git, htop, gh, jq, gnupg, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. asdf with Node.js LTS. Sets zsh as the default shell.
+Headless Ubuntu 26.04 LTS dev box, no desktop session (boots to `multi-user.target`). Two jobs: a dev
+environment reached over SSH, and a GitHub Actions self-hosted runner that deploys to another machine over
+Tailscale (runner install itself is a manual step — see below).
 
-#### Ubuntu — OpenClaw Agent
+**Packages:** build-essential, ca-certificates, curl, git, gnupg, htop, jq, pipx, python3-pip, ripgrep, tmux, trash-cli, vim, wget, yq, zsh (apt)
 
-Standalone [OpenClaw](https://openclaw.ai) machine on Ubuntu 26.04 LTS Desktop (amd64). Everything runs here — no Mac involved.
+**GitHub CLI:** via official apt repository
 
-**Remote access:** SSH (password auth, key-based configured manually), RDP via gnome-remote-desktop (port 3389), Tailscale
+**Node.js:** v22 via NodeSource; npm global prefix set to `~/.npm-global` and added to `PATH` via `~/.zprofile`
 
-**Claude CLI:** installed via official apt repository; authenticate with `claude` after install
+**Linuxbrew:** assumed already installed on the box; this script only wires `PATH` into `~/.zprofile`
 
-**OpenClaw:** installed via official installer; wire to Claude CLI with `openclaw models auth login --provider anthropic --method cli --set-default`, then run `openclaw onboard --install-daemon`
+**Claude Code CLI:** installed via official apt repository; authenticate with `claude` after install
 
-**Browser:** Google Chrome stable (via Google's official apt repository) — a real browser for OpenClaw's QR-code login and browser automation
+**Browser:** Google Chrome stable (via Google's official apt repository) — headless browser automation for Claude Code
 
-**WhatsApp channel:** set up after onboarding by scanning QR code in browser (use RDP if no physical display)
+**Tailscale:** installed and enabled; run `sudo tailscale up` to authenticate
 
-**iMessage channel:** connect to a mac-openclaw iMessage bridge via the `@openclaw/imessage` plugin over Tailscale
-
-**Node.js:** v22 via NodeSource
+**SSH:** openssh-server enabled and started; generates `~/.ssh/id_ed25519` if not present
 
 **Shell:** zsh
 
-**Git snapshots:** user crontab entry commits and pushes `~/.openclaw` every 15 minutes (initialize the repo and add a remote first)
+Sets `systemd-timesyncd` running and the default boot target to `multi-user.target`.
+
+Manual steps printed at the end: git identity, `gh auth login`, `claude` auth, `tailscale up`, and setting up the GitHub Actions self-hosted runner.
+
+#### Ubuntu (WSL2)
+
+General-purpose Ubuntu dev environment for WSL2 on Windows. Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, universal-ctags, git, htop, gh, jq, gnupg, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. asdf with Node.js LTS. Sets zsh as the default shell. Use `LAPTOP_SKIP_DOCKER=1` when Docker Desktop already provides Docker to the WSL guest.
 
 #### Raspberry Pi
 
-Same as Ubuntu plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 (persisted via netfilter-persistent) so you can access the Pi remotely.
+Same as Ubuntu (WSL2) plus **headless setup**: enables and starts the SSH service and configures iptables rules for port 22 (persisted via netfilter-persistent) so you can access the Pi remotely.
 
 #### Debian Jumpbox
 
@@ -257,7 +254,7 @@ waits for you to complete it there. Once authenticated, it prints the Tailscale 
 
 **Step 1** sets up [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) with Ubuntu, [Chocolatey](https://chocolatey.org/), and Windows apps: git, vscode, docker-desktop, googlechrome, slack, powershell. **Requires Administrator**; reboot if prompted.
 
-**Step 2** runs the Ubuntu script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1` — Docker Desktop provides Docker to WSL. After both steps you get the same environment as Mac/Ubuntu (asdf, Node.js LTS, zsh, tmux, etc.).
+**Step 2** runs the `ubuntu-wsl` script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1` — Docker Desktop provides Docker to WSL. After both steps you get a general dev environment (asdf, Node.js LTS, zsh, tmux, etc.).
 
 Run log
 -------
@@ -273,7 +270,7 @@ without having to remember. Each line is tab-separated:
 For example:
 
 ```
-2026-06-04T11:42:07-0700	ubuntu-openclaw	openclaw-box	38149cd1f0a2	ok	214s	exit=0
+2026-06-04T11:42:07-0700	ubuntu	devbox	38149cd1f0a2	ok	214s	exit=0
 2026-06-02T09:15:33-0700	mac-agentic	Jonathons-MBP	5a6c09ebc7d1	fail	   8s	exit=1
 ```
 
