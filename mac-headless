@@ -1,0 +1,264 @@
+#!/bin/sh
+
+# Welcome to the mac-headless machine script!
+# Sets up a headless MacBook Pro (Apple Silicon, lid closed, screen off) as a
+# Claude Code automation box: MCP-connected agent work now (e.g. Jira
+# cleanup), general dev work later. Reachable via SSH / Screen Sharing /
+# Tailscale, tuned to survive reboots and stay awake (screen off, system on)
+# without any physical console.
+# After this script completes, follow the manual steps shown in the summary.
+
+# Ask for sudo upfront so we don't have to get it later
+sudo -v
+
+# Keep using sudo so the permissions don't time out
+while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
+
+# Run logging -- append one tab-separated line per run to ~/.laptop/runs.log so
+# it's easy to see which script ran on which host, when, for how long, against
+# which repo commit, and whether it succeeded. The commit is fetched lazily at
+# exit (via curl or wget) and falls back to "unknown" when offline or unset.
+LAPTOP_SCRIPT="mac-headless"
+LAPTOP_RUN_START=$(date +%s)
+
+log_run() {
+  _ret="$1"
+  _dur=$(( $(date +%s) - LAPTOP_RUN_START ))
+  if [ "$_ret" -eq 0 ]; then _outcome="ok"; else _outcome="fail"; fi
+  _api="https://api.github.com/repos/jonstorer/laptop/commits/main"
+  _commit=$( { curl -fsSL "$_api" 2>/dev/null || wget -qO- "$_api" 2>/dev/null; } \
+    | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-12)
+  [ -n "$_commit" ] || _commit="unknown"
+  mkdir -p "$HOME/.laptop"
+  printf '%s\t%s\t%s\t%s\t%s\t%ss\texit=%s\n' \
+    "$(date '+%Y-%m-%dT%H:%M:%S%z')" \
+    "$LAPTOP_SCRIPT" "$(hostname)" "$_commit" \
+    "$_outcome" "$_dur" "$_ret" >> "$HOME/.laptop/runs.log"
+}
+
+# shellcheck disable=SC2154
+trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
+set -e
+
+# Run with LAPTOP_DEBUG=1 for full command tracing -- helpful when testing
+# on a new machine (e.g. a VM) and diagnosing exactly where a failure
+# happened, since set -e otherwise exits silently with no indication of
+# which command failed beyond its own error output.
+[ -n "${LAPTOP_DEBUG:-}" ] && set -x
+
+echo "macOS: $(sw_vers -productVersion 2>/dev/null || echo unknown), arch: $(uname -m)"
+
+###############################################################################
+# Time sync -- clock skew breaks TLS verification for softwareupdate, which  #
+# Homebrew's installer uses to fetch the Xcode Command Line Tools           #
+###############################################################################
+
+echo "Syncing system clock ..."
+sudo sntp -sS time.apple.com > /dev/null 2>&1 || true
+
+###############################################################################
+# Homebrew                                                                    #
+###############################################################################
+
+if ! command -v brew > /dev/null 2>&1; then
+  echo "Installing Homebrew ..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+fi
+
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+echo "Updating Homebrew ..."
+brew update --force
+
+brew bundle --file=- <<EOF
+# AI tooling
+cask "claude-code"
+
+# Browser -- one-time OAuth flows (Claude login, MCP auth) done over Screen
+# Sharing since there's no physical display
+cask "google-chrome"
+
+# GUI apps -- for occasional Screen Sharing sessions
+cask "alfred"
+cask "iterm2"
+cask "rectangle"
+cask "textmate"
+
+# Libraries & tools
+brew "curl"
+brew "forego"
+brew "git"
+brew "gnupg"
+brew "openssl"
+brew "shellcheck"
+brew "jq"
+brew "yq"
+brew "htop"
+brew "the_silver_searcher"
+brew "tmate"
+brew "tmux"
+brew "vim"
+brew "wget"
+brew "zsh"
+brew "gh"
+brew "mise"
+
+# Remote access
+brew "tailscale"
+EOF
+
+brew upgrade
+
+# Node.js via mise, pinning versions per-repo via
+# mise.toml/.nvmrc. `mise use --global` just sets the fallback used outside
+# any pinned repo.
+if command -v mise > /dev/null 2>&1; then
+  echo "Setting up mise and Node.js ..."
+  mise use --global node@lts
+  echo "Node.js LTS set as global default via mise: $(mise exec node -- node -v 2>/dev/null || echo 'unable to verify')"
+
+  ZPROFILE="$HOME/.zprofile.local"
+  if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
+    # shellcheck disable=SC2016
+    printf '\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
+  fi
+
+  # Shell init (.zshrc) is managed by dotfiles - do not modify
+fi
+
+###############################################################################
+# zsh                                                                         #
+###############################################################################
+
+shell_path="$(command -v zsh)"
+echo "Ensuring default shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+if [ "$SHELL" != "$shell_path" ]; then
+  sudo chsh -s "$shell_path" "$USER"
+fi
+
+###############################################################################
+# SSH -- enable Remote Login for remote access                               #
+###############################################################################
+
+echo "Enabling SSH Remote Login ..."
+sudo systemsetup -setremotelogin on 2>/dev/null || \
+  echo "Could not enable Remote Login -- see TODO.md (needs Full Disk Access)."
+
+###############################################################################
+# Screen Sharing -- enable for remote desktop (needed for interactive OAuth  #
+# steps, since the box has no physical display)                              #
+###############################################################################
+
+echo "Enabling Screen Sharing ..."
+nc -z localhost 5900 2>/dev/null || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+
+###############################################################################
+# Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
+###############################################################################
+
+echo "Starting Tailscale daemon ..."
+sudo brew services start tailscale
+
+###############################################################################
+# Power management -- tuned for an unattended box                            #
+###############################################################################
+
+# Prevent system sleep entirely (independent of the display, which stays off
+# with the lid closed) -- this is what keeps a lid-closed MacBook reachable.
+# Also wake on network access (lets SSH/Tailscale wake it if it ever does
+# sleep) and auto-restart after a power failure -- important for a box
+# tucked away with no one around to press the power button. Trade-off: no
+# idle power savings, which is the point for an always-on automation box.
+echo "Tuning pmset for unattended operation ..."
+sudo pmset -a disablesleep 1
+sudo pmset -a womp 1
+sudo pmset -a autorestart 1
+
+###############################################################################
+# macOS defaults -- automation-friendly only                                 #
+###############################################################################
+
+echo "Configuring macOS defaults ..."
+
+# Keep background processes alive
+defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
+
+# No iCloud document syncing
+defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
+
+# Reveal IP address, hostname, OS version when clicking clock in login window
+sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
+
+# Locale
+defaults write NSGlobalDomain AppleLanguages -array "en"
+defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
+defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+
+# Require password immediately after screensaver
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
+
+# No .DS_Store on network volumes
+defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
+
+# No confirmation dialogs that could block automation
+defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
+defaults write com.apple.finder WarnOnEmptyTrash -bool false
+
+for app in "Dock" "Finder" "SystemUIServer"; do
+  killall "$app" > /dev/null 2>&1 || true
+done
+
+echo "macOS defaults configured."
+
+###############################################################################
+# TODO.md -- manual steps with live status                                   #
+###############################################################################
+
+_ok() { sh -c "$1" > /dev/null 2>&1 && printf 'x' || printf ' '; }
+
+_CLAUDE=$(_ok "claude auth status")
+_MCP=$(_ok "claude mcp list | grep -qi atlassian")
+_SSH=$(_ok "sudo systemsetup -getremotelogin 2>/dev/null | grep -qi 'On'")
+_TS=$(_ok "tailscale status")
+_GIT=$(_ok "git config --global user.name | grep -q . && git config --global user.email | grep -q .")
+_GH=$(_ok "gh auth status")
+_GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
+TODO_FILE="$HOME/TODO.md"
+
+cat > "$TODO_FILE" <<EOF
+# Mac Headless Devbox Setup
+
+_Last updated: $_GENERATED — rerun mac-headless to refresh status._
+
+- [$_CLAUDE] Authenticate Claude CLI: \`claude\` (interactive TTY required -- use SSH or Screen Sharing)
+- [$_MCP] Add the Atlassian MCP for Jira cleanup: \`claude mcp add --transport sse atlassian https://mcp.atlassian.com/v1/sse\` then authenticate (opens a browser -- use Screen Sharing/Chrome)
+- [$_SSH] Enable SSH Remote Login: grant Full Disk Access to this terminal app (System Settings -> Privacy & Security -> Full Disk Access), then run \`sudo systemsetup -setremotelogin on\` (or re-run this script) -- macOS won't allow this from a script without it
+- [$_TS] Authenticate Tailscale: \`sudo tailscale up\`
+- [$_GIT] Set git identity: \`git config --global user.name "Name" && git config --global user.email "you@example.com"\`
+- [$_GH] Authenticate GitHub CLI: \`gh auth login\`
+EOF
+
+###############################################################################
+# Summary                                                                     #
+###############################################################################
+
+LOCAL_IP="$(ipconfig getifaddr en0 2>/dev/null || echo 'unknown')"
+
+echo ""
+echo "============================================================"
+echo "Setup complete. This Mac is a headless Claude Code devbox."
+echo ""
+echo "Local IP:        $LOCAL_IP"
+echo "SSH:              ssh $USER@$LOCAL_IP"
+echo "Screen Sharing:   vnc://$LOCAL_IP"
+echo ""
+echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
+echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
+echo ""
+echo "Manual steps: $TODO_FILE"
+echo "============================================================"

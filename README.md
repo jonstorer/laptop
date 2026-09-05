@@ -14,6 +14,7 @@ Support For:
 
 * macOS (Apple Silicon) — `mac-agentic`
 * macOS (Apple Silicon or Intel x86_64) — `mac-openclaw`
+* macOS (Apple Silicon) — `mac-headless`
 * macOS (Intel x86_64) — `mac-x86_64`
 * Ubuntu 20.04+ — `ubuntu`
 * Ubuntu 26.04 LTS Desktop (amd64) — `ubuntu-openclaw`
@@ -43,6 +44,14 @@ Sets up a Mac as an iMessage bridge for a ubuntu-openclaw installation. BlueBubb
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-openclaw' | sh
+```
+
+#### Mac — Headless Devbox (Apple Silicon)
+
+Sets up a MacBook Pro to run lid-closed, screen-off, as a Claude Code automation box: MCP-connected agent work (e.g. Jira cleanup) now, general dev work later. Reachable via SSH, Screen Sharing, and Tailscale.
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-headless' | sh
 ```
 
 #### Mac — Intel (x86_64)
@@ -150,6 +159,28 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 Sets zsh as the default shell and applies macOS defaults optimized for autonomous/headless operation.
 
 Writes a `TODO.md` to the working directory with live status checks for each manual step.
+
+#### Mac — Headless Devbox (Apple Silicon)
+
+Uses [Homebrew](http://brew.sh/) for package management. Apple Silicon only.
+
+**Casks:** claude-code, google-chrome, alfred, iterm2, rectangle, textmate
+
+**CLI tools:** curl, forego, git, gnupg, openssl, shellcheck, jq, yq, htop, the_silver_searcher, tmate, tmux, vim, wget, zsh, gh, mise, tailscale
+
+**Node.js:** [mise](https://mise.jdx.dev) sets a global LTS default; per-repo pinned versions (`mise.toml`/`.nvmrc`) take over automatically when you `cd` in.
+
+**SSH:** attempts to enable Remote Login via `systemsetup`; macOS requires Full Disk Access for the terminal running the script to actually allow this, so it's also a live-checked manual step in `TODO.md` if it doesn't take.
+
+**Screen Sharing:** enabled for remote desktop — the fallback for interactive steps (browser OAuth for Claude/MCP login, or just working on the box directly with Alfred/iTerm2/Rectangle/TextMate) since the box has no physical display.
+
+**Tailscale:** installed and daemon started; run `sudo tailscale up` to authenticate.
+
+**Power management:** `pmset` tuned for unattended operation — `disablesleep` keeps the system awake independent of the display (which stays off with the lid closed), plus wake-on-network-access and auto-restart-after-power-failure.
+
+Sets zsh as the default shell and applies the automation-friendly subset of macOS defaults (no confirmation dialogs, no iCloud doc sync).
+
+Writes a `TODO.md` to `$HOME` with live status checks for each manual step (Claude auth, Atlassian MCP, Tailscale auth, git identity, gh auth).
 
 #### Mac — Intel (x86_64)
 
