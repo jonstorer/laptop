@@ -1,9 +1,8 @@
 #!/bin/sh
 
-# Welcome to the mac-openclaw machine script!
-# Sets up macOS as an iMessage bridge for a ubuntu-openclaw installation.
-# BlueBubbles exposes Messages.app via web API; ubuntu-openclaw connects to it
-# via the @openclaw/imessage plugin.
+# Welcome to the mac-bluebubbles machine script!
+# Sets up macOS as an iMessage bridge via BlueBubbles, which exposes
+# Messages.app via a web API for other machines to connect to.
 # After this script completes, follow the manual steps shown in the summary.
 
 # Ask for sudo upfront so we don't have to get it later
@@ -16,7 +15,7 @@ while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 # it's easy to see which script ran on which host, when, for how long, against
 # which repo commit, and whether it succeeded. The commit is fetched lazily at
 # exit (via curl or wget) and falls back to "unknown" when offline or unset.
-LAPTOP_SCRIPT="mac-openclaw"
+LAPTOP_SCRIPT="mac-bluebubbles"
 LAPTOP_RUN_START=$(date +%s)
 
 log_run() {
@@ -213,15 +212,15 @@ _GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
 TODO_FILE="$HOME/TODO.md"
 
 cat > "$TODO_FILE" <<EOF
-# Mac OpenClaw Setup
+# Mac BlueBubbles Setup
 
-_Last updated: $_GENERATED — rerun mac-openclaw to refresh status._
+_Last updated: $_GENERATED — rerun mac-bluebubbles to refresh status._
 
 - [$_TS] Authenticate Tailscale: \`sudo tailscale up\`
 - [$_BB] Launch BlueBubbles, sign in with Apple ID, enable REST API (Settings → Server → enable REST API), note the server URL and password
 - [ ] Approve Automation permission — macOS will prompt when osascript first accesses Messages.app; allow in System Settings → Privacy & Security → Automation
 - [ ] Sign into iMessage — Messages.app → Settings → iMessage
-- [ ] On the Ubuntu machine run \`openclaw configure\` and supply the BlueBubbles server URL and password
+- [ ] On the machine connecting to this bridge, supply the BlueBubbles server URL and password
 EOF
 
 ###############################################################################
@@ -232,7 +231,7 @@ LOCAL_IP="$(ipconfig getifaddr en2 2>/dev/null || echo 'unknown')"
 
 echo ""
 echo "============================================================"
-echo "Setup complete. This Mac is an iMessage bridge for ubuntu-openclaw."
+echo "Setup complete. This Mac is an iMessage bridge via BlueBubbles."
 echo ""
 echo "Local IP (WiFi):  $LOCAL_IP"
 echo "SSH:              ssh $USER@$LOCAL_IP"

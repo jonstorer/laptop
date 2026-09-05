@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Welcome to the ubuntu-wsl machine script!
-# General-purpose Ubuntu dev environment (asdf, Node.js, Docker, zsh) for
+# General-purpose Ubuntu dev environment (mise, Node.js, Docker, zsh) for
 # WSL2 on Windows. Use LAPTOP_SKIP_DOCKER=1 when Docker Desktop already
 # provides Docker to the WSL guest.
 
@@ -64,22 +64,25 @@ fi
 # shellcheck disable=SC2086
 sudo apt install -y $apt_packages
 
-# Install asdf and Node.js
-if [ ! -d "$HOME/.asdf" ]; then
-  echo "Setting up asdf and Node.js ..."
-  git clone https://github.com/asdf-vm/asdf.git "$HOME/.asdf" --branch v0.16.0
-  # shellcheck disable=SC1091
-  . "$HOME/.asdf/asdf.sh"
+# Install mise and Node.js
+export PATH="$HOME/.local/bin:$PATH"
+if ! command -v mise > /dev/null 2>&1; then
+  echo "Installing mise ..."
+  curl -fsSL https://mise.run | sh
+fi
 
-  asdf plugin add nodejs 2>/dev/null || true
-  asdf install nodejs lts 2>/dev/null || true
-  node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
-  if [ -n "$node_version" ]; then
-    asdf set -u nodejs "$node_version"
-    echo "Node.js $node_version set as global default"
+if command -v mise > /dev/null 2>&1; then
+  echo "Setting up mise and Node.js ..."
+  mise use --global node@lts
+  echo "Node.js LTS set as global default via mise: $(mise exec node -- node -v 2>/dev/null || echo 'unable to verify')"
+
+  ZPROFILE="$HOME/.zprofile.local"
+  if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
+    # shellcheck disable=SC2016
+    printf '\nexport PATH="$HOME/.local/bin:$PATH"\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
   fi
 
-  # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
+  # Shell init (.zshrc) is managed by dotfiles - do not modify
 fi
 
 shell_path="$(command -v zsh)"

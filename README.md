@@ -13,7 +13,7 @@ Requirements
 Support For:
 
 * macOS (Apple Silicon) — `mac-agentic`
-* macOS (Apple Silicon or Intel x86_64) — `mac-openclaw`
+* macOS (Apple Silicon or Intel x86_64) — `mac-bluebubbles`
 * macOS (Apple Silicon) — `mac-headless`
 * macOS (Intel x86_64) — `mac-x86_64`
 * Ubuntu 26.04 LTS (amd64) — `ubuntu`
@@ -38,12 +38,12 @@ Human dev machine with AI workflows: Claude, Ollama, VS Code, Claude Code.
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-agentic' | sh
 ```
 
-#### Mac — OpenClaw iMessage Bridge (Apple Silicon or Intel x86_64)
+#### Mac — BlueBubbles iMessage Bridge (Apple Silicon or Intel x86_64)
 
-Sets up a Mac as an iMessage bridge for an OpenClaw installation. BlueBubbles exposes Messages.app via web API; OpenClaw connects via the `@openclaw/imessage` plugin over Tailscale.
+Sets up a Mac as an iMessage bridge via BlueBubbles, which exposes Messages.app via a web API for other machines to connect to over Tailscale.
 
 ```sh
-curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-openclaw' | sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-bluebubbles' | sh
 ```
 
 #### Mac — Headless Devbox (Apple Silicon)
@@ -179,9 +179,9 @@ Uses [Homebrew](http://brew.sh/) for package management. Intel x86_64 only.
 
 **Casks:** alfred, docker-desktop, google-chrome, iterm2, kap, postman, rectangle, slack, spotify, macdown, textmate, karabiner-elements, ngrok, qlstephen
 
-**CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, asdf
+**CLI tools:** gnupg, openssl, shellcheck, gcc, git, htop, watch, the_silver_searcher, tmux, vim, zsh, tmate, grep, jq, forego, mise
 
-**Node.js:** asdf with asdf-nodejs plugin; installs current LTS and sets as global default.
+**Node.js:** [mise](https://mise.jdx.dev) sets a global LTS default; per-repo pinned versions (`mise.toml`/`.nvmrc`) take over automatically when you `cd` in.
 
 Sets zsh as the default shell and applies macOS defaults.
 
@@ -215,7 +215,7 @@ Manual steps printed at the end: git identity, `gh auth login`, `claude` auth, `
 
 #### Ubuntu (WSL2)
 
-General-purpose Ubuntu dev environment for WSL2 on Windows. Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, universal-ctags, git, htop, gh, jq, gnupg, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. asdf with Node.js LTS. Sets zsh as the default shell. Use `LAPTOP_SKIP_DOCKER=1` when Docker Desktop already provides Docker to the WSL guest.
+General-purpose Ubuntu dev environment for WSL2 on Windows. Installs Docker (CE, compose, buildx) and common development tools: build-essential, gcc, zsh, universal-ctags, git, htop, gh, jq, gnupg, libssl-dev, openssl, openssh-server, silversearcher-ag, shellcheck, tmate, tmux, vim, watch. [mise](https://mise.jdx.dev) with Node.js LTS. Sets zsh as the default shell. Use `LAPTOP_SKIP_DOCKER=1` when Docker Desktop already provides Docker to the WSL guest.
 
 #### Raspberry Pi
 
@@ -254,7 +254,7 @@ waits for you to complete it there. Once authenticated, it prints the Tailscale 
 
 **Step 1** sets up [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) with Ubuntu, [Chocolatey](https://chocolatey.org/), and Windows apps: git, vscode, docker-desktop, googlechrome, slack, powershell. **Requires Administrator**; reboot if prompted.
 
-**Step 2** runs the `ubuntu-wsl` script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1` — Docker Desktop provides Docker to WSL. After both steps you get a general dev environment (asdf, Node.js LTS, zsh, tmux, etc.).
+**Step 2** runs the `ubuntu-wsl` script inside WSL (see Install section above). Use `LAPTOP_SKIP_DOCKER=1` — Docker Desktop provides Docker to WSL. After both steps you get a general dev environment (mise, Node.js LTS, zsh, tmux, etc.).
 
 Run log
 -------

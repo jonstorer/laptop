@@ -75,24 +75,24 @@ brew "tmate"
 brew "grep"
 brew "jq"
 brew "forego"
-brew "asdf"
+brew "mise"
 EOF
 
-# Configure asdf and Node.js
-if [ -f "$(brew --prefix asdf 2>/dev/null)/libexec/asdf.sh" ]; then
-  echo "Setting up asdf and Node.js ..."
-  # shellcheck disable=SC1091
-  . "$(brew --prefix asdf)/libexec/asdf.sh"
+# Node.js via mise, pinning versions per-repo via
+# mise.toml/.nvmrc. `mise use --global` just sets the fallback used outside
+# any pinned repo.
+if command -v mise > /dev/null 2>&1; then
+  echo "Setting up mise and Node.js ..."
+  mise use --global node@lts
+  echo "Node.js LTS set as global default via mise: $(mise exec node -- node -v 2>/dev/null || echo 'unable to verify')"
 
-  asdf plugin add nodejs 2>/dev/null || true
-  asdf install nodejs lts 2>/dev/null || true
-  node_version=$(asdf list nodejs 2>/dev/null | tail -1 | sed 's/^[ *]*//')
-  if [ -n "$node_version" ]; then
-    asdf set -u nodejs "$node_version"
-    echo "Node.js $node_version set as global default"
+  ZPROFILE="$HOME/.zprofile.local"
+  if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
+    # shellcheck disable=SC2016
+    printf '\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
   fi
 
-  # Config files (.zshrc, .asdfrc) are managed by dotfiles - do not modify
+  # Shell init (.zshrc) is managed by dotfiles - do not modify
 fi
 
 shell_path="$(command -v zsh)"
