@@ -195,7 +195,7 @@ Tailscale (runner install itself is a manual step — see below).
 
 **GitHub CLI:** via official apt repository
 
-**Node.js:** v22 via NodeSource; npm global prefix set to `~/.npm-global` and added to `PATH` via `~/.zprofile`
+**Node.js:** [mise](https://mise.jdx.dev) re-resolves to the latest LTS on every run and sets it as the global default
 
 **Claude Code CLI:** installed via official apt repository; authenticate with `claude` after install
 

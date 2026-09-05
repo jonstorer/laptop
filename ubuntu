@@ -95,38 +95,23 @@ else
 fi
 
 ###############################################################################
-# Node.js v22 -- via NodeSource (deb822 format, distro-agnostic)             #
+# Node.js -- via mise, re-resolved to the latest LTS on every run            #
 ###############################################################################
 
-if ! node --version 2>/dev/null | grep -q '^v22\.'; then
-  echo "Installing Node.js 22 via NodeSource ..."
-  sudo install -d -m 0755 /usr/share/keyrings
-  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-    | sudo gpg --dearmor --batch --yes -o /usr/share/keyrings/nodesource.gpg
-  sudo chmod 644 /usr/share/keyrings/nodesource.gpg
-  printf 'Types: deb\nURIs: https://deb.nodesource.com/node_22.x\nSuites: nodistro\nComponents: main\nArchitectures: %s\nSigned-By: /usr/share/keyrings/nodesource.gpg\n' \
-    "$(dpkg --print-architecture)" \
-    | sudo tee /etc/apt/sources.list.d/nodesource.sources > /dev/null
-  wait_for_apt
-  sudo -E apt update
-  sudo -E apt install -y nodejs
-else
-  echo "Node.js 22 already installed, skipping."
+export PATH="$HOME/.local/bin:$PATH"
+if ! command -v mise > /dev/null 2>&1; then
+  echo "Installing mise ..."
+  curl -fsSL https://mise.run | sh
 fi
 
-###############################################################################
-# npm global prefix -- user-owned, no sudo needed                            #
-###############################################################################
-
-NPM_GLOBAL="$HOME/.npm-global"
-mkdir -p "$NPM_GLOBAL"
-npm config set prefix "$NPM_GLOBAL"
-export PATH="$NPM_GLOBAL/bin:$PATH"
+echo "Setting up mise and Node.js ..."
+mise use --global node@lts
+echo "Node.js LTS set as global default via mise: $(mise exec node -- node -v 2>/dev/null || echo 'unable to verify')"
 
 ZPROFILE="$HOME/.zprofile"
-if ! grep -qF 'npm-global' "$ZPROFILE" 2>/dev/null; then
+if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
   # shellcheck disable=SC2016
-  printf '\nexport PATH="$HOME/.npm-global/bin:$PATH"\n' >> "$ZPROFILE"
+  printf '\nexport PATH="$HOME/.local/bin:$PATH"\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
 fi
 
 ###############################################################################
