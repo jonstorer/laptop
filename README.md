@@ -197,8 +197,6 @@ Tailscale (runner install itself is a manual step — see below).
 
 **Node.js:** v22 via NodeSource; npm global prefix set to `~/.npm-global` and added to `PATH` via `~/.zprofile`
 
-**Linuxbrew:** assumed already installed on the box; this script only wires `PATH` into `~/.zprofile`
-
 **Claude Code CLI:** installed via official apt repository; authenticate with `claude` after install
 
 **Browser:** Google Chrome stable (via Google's official apt repository) — headless browser automation for Claude Code

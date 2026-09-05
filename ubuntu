@@ -130,15 +130,6 @@ if ! grep -qF 'npm-global' "$ZPROFILE" 2>/dev/null; then
 fi
 
 ###############################################################################
-# Linuxbrew -- already installed on this box, just wire up the PATH          #
-###############################################################################
-
-if ! grep -qF 'linuxbrew' "$ZPROFILE" 2>/dev/null; then
-  # shellcheck disable=SC2016
-  printf '\neval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\n' >> "$ZPROFILE"
-fi
-
-###############################################################################
 # Claude Code CLI -- via official apt repository                              #
 ###############################################################################
 
