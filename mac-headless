@@ -70,6 +70,11 @@ eval "$(/opt/homebrew/bin/brew shellenv)"
 echo "Updating Homebrew ..."
 brew update --force
 
+# Adopt any cask below that's already present but wasn't installed via
+# Homebrew (e.g. a machine that came with some apps pre-installed) instead
+# of failing the whole bundle.
+export HOMEBREW_CASK_OPTS="--adopt"
+
 brew bundle --file=- <<EOF
 # AI tooling
 cask "claude-code"
