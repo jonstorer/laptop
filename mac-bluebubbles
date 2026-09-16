@@ -7,7 +7,8 @@
 # Tailscale.
 # After this script completes, follow the manual steps shown in the summary.
 
-# Ask for sudo upfront so we don't have to get it later
+# Ask for sudo upfront. It stays cached only until the first brew command, so
+# root-level setup runs before Homebrew (see below).
 sudo -v
 
 # Keep using sudo so the permissions don't time out
@@ -38,6 +39,226 @@ log_run() {
 # shellcheck disable=SC2154
 trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
+
+###############################################################################
+# Root-level setup -- runs before Homebrew                                   #
+###############################################################################
+
+# Every brew command resets sudo's cached credentials (brew.sh runs
+# `sudo --reset-timestamp`), so any sudo after the first brew call prompts for
+# the password again, and the keep-alive loop above can't prevent it. Do
+# everything that needs root here, while the password from `sudo -v` is still
+# cached.
+
+###############################################################################
+# SSH -- enable Remote Login for remote access                               #
+###############################################################################
+
+# Probe the port rather than pgrep sshd: macOS starts sshd on demand, so run
+# at the console with nobody connected there's no sshd process to find.
+nc -z localhost 22 2>/dev/null || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+
+###############################################################################
+# Screen Sharing -- enable for remote desktop                                #
+###############################################################################
+
+nc -z localhost 5900 2>/dev/null || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+
+###############################################################################
+# Cleanup -- remove the old Internet Sharing setup                           #
+###############################################################################
+
+# This Mac used to share its Wi-Fi to the Ethernet ports. That's gone: nothing
+# is plugged into Ethernet, and the service this script loaded
+# (com.apple.InternetSharing.plist) no longer exists on current macOS, so the
+# load only printed "Load failed: 5". Remove the launchd daemon an older
+# version of this setup installed to rewrite the sharing config. Turn sharing
+# back on in System Settings -> General -> Sharing if it's ever needed.
+ICS_PLIST="/Library/LaunchDaemons/ai.openclaw.internet-sharing.plist"
+if [ -f "$ICS_PLIST" ]; then
+  echo "Removing the old Internet Sharing daemon ..."
+  sudo launchctl bootout system "$ICS_PLIST" 2>/dev/null || true
+  sudo rm -f "$ICS_PLIST" /usr/local/sbin/openclaw-ics
+fi
+
+###############################################################################
+# zsh                                                                         #
+###############################################################################
+
+shell_path="$(command -v zsh)"
+echo "Ensuring default shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+if [ "$SHELL" != "$shell_path" ]; then
+  sudo chsh -s "$shell_path" "$USER"
+fi
+
+###############################################################################
+# macOS defaults -- automation-friendly only                                 #
+###############################################################################
+
+echo "Configuring macOS defaults ..."
+
+# Keep background processes alive
+defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
+
+# No iCloud document syncing
+defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
+
+# Reveal IP address, hostname, OS version when clicking clock in login window
+sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
+
+# Locale
+defaults write NSGlobalDomain AppleLanguages -array "en"
+defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
+defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+
+# Require password immediately after screensaver
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
+
+# No .DS_Store on network volumes
+defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
+
+# No confirmation dialogs that could block automation
+defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
+defaults write com.apple.finder WarnOnEmptyTrash -bool false
+
+for app in "Dock" "Finder" "SystemUIServer"; do
+  killall "$app" > /dev/null 2>&1 || true
+done
+
+echo "macOS defaults configured."
+
+###############################################################################
+# Power & Software Update -- lock down settings that cause silent downtime   #
+###############################################################################
+
+# Sleeping or a silent point-release both take a headless box offline with no
+# one around to notice. Disable sleep outright (a headless box has no display
+# to protect and no battery to save), enable wake-on-LAN as a safety net in
+# case sleep is ever re-enabled, and auto-restart after a power interruption.
+echo "Tuning pmset for unattended operation ..."
+sudo pmset -a sleep 0 displaysleep 0 disksleep 0 powernap 0 womp 1 autorestart 1
+
+# A background point update can silently strip root patches on OCLP-patched
+# hardware and lock out remote access -- disable automatic checks/downloads so
+# updates only happen when explicitly run by hand.
+echo "Disabling automatic macOS software updates ..."
+sudo softwareupdate --schedule off > /dev/null 2>&1 || true
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticCheckEnabled -bool false
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticDownload -bool false
+sudo defaults write /Library/Preferences/com.apple.commerce AutoUpdate -bool false
+
+###############################################################################
+# health-check -- warn before hardware trouble takes the box down            #
+###############################################################################
+
+# Runs as root every 15 minutes (needs root for smartctl/powermetrics) and
+# checks the things most likely to precede an unattended failure: a failing
+# drive, a full disk, heavy swapping, an overheating CPU, a stalled fan, lost
+# AC power (if a UPS is connected and macOS recognizes it), and whether
+# BlueBubbles/Messages.app are still up. Every run appends one summary line
+# to the log for trend-watching -- no push/text/email wiring for now, just
+# `tail -f /var/log/laptop-health.log` (or grep it) when checking in.
+# Installed here, before Homebrew, to stay inside the cached sudo; on a fresh
+# Mac the first run skips SMART until brew installs smartmontools and jq.
+HEALTH_SCRIPT="$HOME/Scripts/health-check.sh"
+mkdir -p "$HOME/Scripts"
+cat > "$HEALTH_SCRIPT" <<'HEALTHSH'
+#!/bin/zsh
+
+# Homebrew's bin isn't on root's PATH by default (jq/smartctl come from brew).
+if [ -d /opt/homebrew/bin ]; then
+  PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+else
+  PATH="/usr/local/bin:/usr/local/sbin:$PATH"
+fi
+export PATH
+
+LOG="/var/log/laptop-health.log"
+
+alerts=""
+alert_count=0
+add_alert() {
+  alert_count=$((alert_count + 1))
+  if [ -n "$alerts" ]; then alerts="$alerts; $1"; else alerts="$1"; fi
+}
+
+# SMART health -- catches a drive failing before it takes the box down. Some
+# older Apple SSDs don't expose SMART over their proprietary controller;
+# treat "not supported" as informational rather than a fault.
+for disk in $(diskutil list -plist | plutil -convert json -o - - 2>/dev/null | jq -r '.WholeDisks[]?' 2>/dev/null); do
+  smart_out=$(smartctl -H "/dev/$disk" 2>&1)
+  case "$smart_out" in
+    *FAILED*) add_alert "SMART: /dev/$disk reports FAILED" ;;
+  esac
+done
+
+# Disk space
+disk_pct=$(df -P / | awk 'NR==2 { gsub("%","",$5); print $5 }')
+[ -n "$disk_pct" ] && [ "$disk_pct" -ge 90 ] && add_alert "Disk: / is ${disk_pct}% full"
+
+# Swap -- heavy sustained swapping on a 64GB box usually means something is
+# leaking or misconfigured, and precedes the box grinding to a halt.
+swap_used=$(sysctl -n vm.swapusage 2>/dev/null | grep -o 'used = [0-9.]*M' | grep -o '[0-9.]*')
+if [ -n "$swap_used" ] && awk "BEGIN { exit !($swap_used > 8192) }"; then
+  add_alert "Memory: swap usage is ${swap_used}MB"
+fi
+
+# Thermal -- catches the aging-paste failure mode (rising idle temps) and a
+# dead/stalled fan before either causes a thermal shutdown.
+smc_out=$(powermetrics -n 1 -i 1000 --samplers smc 2>/dev/null)
+cpu_temp=$(echo "$smc_out" | grep -i "CPU die temperature" | grep -o '[0-9.]*' | head -1)
+if [ -n "$cpu_temp" ] && awk "BEGIN { exit !($cpu_temp > 85) }"; then
+  add_alert "Thermal: CPU die temperature is ${cpu_temp}C"
+fi
+fan_rpm=$(echo "$smc_out" | grep -i "Fan:" | grep -o '[0-9]*' | head -1)
+[ -n "$fan_rpm" ] && [ "$fan_rpm" -eq 0 ] && add_alert "Thermal: fan reads 0 RPM"
+
+# Power -- only fires if a UPS is connected and macOS recognizes it.
+batt_line=$(pmset -g batt 2>/dev/null | head -1)
+case "$batt_line" in
+  *"UPS Power"*) add_alert "Power: running on UPS battery, AC power lost" ;;
+esac
+
+# Service liveness
+pgrep -x BlueBubbles > /dev/null 2>&1 || add_alert "BlueBubbles is not running"
+pgrep -x Messages > /dev/null 2>&1 || add_alert "Messages.app is not running"
+
+printf '%s\tdisk=%s%%\tswap=%sMB\tcpu=%sC\tfan=%sRPM\talerts=%s\t%s\n' \
+  "$(date '+%Y-%m-%dT%H:%M:%S%z')" "${disk_pct:-?}" "${swap_used:-0}" \
+  "${cpu_temp:-?}" "${fan_rpm:-?}" "$alert_count" "${alerts:-none}" >> "$LOG"
+HEALTHSH
+chmod +x "$HEALTH_SCRIPT"
+
+HEALTH_PLIST="/Library/LaunchDaemons/com.laptop.health-check.plist"
+sudo tee "$HEALTH_PLIST" > /dev/null <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.laptop.health-check</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>$HEALTH_SCRIPT</string>
+    </array>
+</dict>
+</plist>
+EOF
+
+# LaunchDaemons load into the system domain (not gui/<uid>) and run as root.
+sudo launchctl bootout system/com.laptop.health-check 2>/dev/null || true
+sudo launchctl bootstrap system "$HEALTH_PLIST"
 
 ###############################################################################
 # Homebrew                                                                    #
@@ -210,54 +431,15 @@ if grep -qxF 'eval "$(mise activate zsh)"' "$ZPROFILE" 2>/dev/null; then
 fi
 
 ###############################################################################
-# SSH -- enable Remote Login for remote access                               #
-###############################################################################
-
-pgrep sshd > /dev/null 2>&1 || \
-  sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
-
-###############################################################################
-# Screen Sharing -- enable for remote desktop                                #
-###############################################################################
-
-nc -z localhost 5900 2>/dev/null || \
-  sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
-
-###############################################################################
 # Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
 ###############################################################################
 
 # Only when Homebrew owns tailscale; otherwise whatever installed it runs it.
+# This comes after brew, so on a Mac that uses Homebrew's tailscale sudo asks
+# for the password again here.
 if [ -n "$_tailscale_brew" ]; then
   sudo brew services start tailscale
 fi
-
-###############################################################################
-# Internet Sharing -- en2 (WiFi) to en0, en1 (Ethernet)                     #
-###############################################################################
-
-# com.apple.nat.plist is already configured -- just ensure the service is running
-sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.InternetSharing.plist 2>/dev/null || true
-
-###############################################################################
-# Power & Software Update -- lock down settings that cause silent downtime   #
-###############################################################################
-
-# Sleeping or a silent point-release both take a headless box offline with no
-# one around to notice. Disable sleep outright (a headless box has no display
-# to protect and no battery to save), enable wake-on-LAN as a safety net in
-# case sleep is ever re-enabled, and auto-restart after a power interruption.
-echo "Tuning pmset for unattended operation ..."
-sudo pmset -a sleep 0 displaysleep 0 disksleep 0 powernap 0 womp 1 autorestart 1
-
-# A background point update can silently strip root patches on OCLP-patched
-# hardware and lock out remote access -- disable automatic checks/downloads so
-# updates only happen when explicitly run by hand.
-echo "Disabling automatic macOS software updates ..."
-sudo softwareupdate --schedule off > /dev/null 2>&1 || true
-sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticCheckEnabled -bool false
-sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticDownload -bool false
-sudo defaults write /Library/Preferences/com.apple.commerce AutoUpdate -bool false
 
 ###############################################################################
 # poke-messages -- keep Messages.app alive for BlueBubbles                  #
@@ -302,161 +484,6 @@ launchctl bootout "gui/$(id -u)/com.user.poke-messages" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$POKE_PLIST"
 
 ###############################################################################
-# health-check -- warn before hardware trouble takes the box down            #
-###############################################################################
-
-# Runs as root every 15 minutes (needs root for smartctl/powermetrics) and
-# checks the things most likely to precede an unattended failure: a failing
-# drive, a full disk, heavy swapping, an overheating CPU, a stalled fan, lost
-# AC power (if a UPS is connected and macOS recognizes it), and whether
-# BlueBubbles/Messages.app are still up. Every run appends one summary line
-# to the log for trend-watching -- no push/text/email wiring for now, just
-# `tail -f /var/log/laptop-health.log` (or grep it) when checking in.
-HEALTH_SCRIPT="$HOME/Scripts/health-check.sh"
-mkdir -p "$HOME/Scripts"
-cat > "$HEALTH_SCRIPT" <<'HEALTHSH'
-#!/bin/zsh
-
-# Homebrew's bin isn't on root's PATH by default (jq/smartctl come from brew).
-if [ -d /opt/homebrew/bin ]; then
-  PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
-else
-  PATH="/usr/local/bin:/usr/local/sbin:$PATH"
-fi
-export PATH
-
-LOG="/var/log/laptop-health.log"
-
-alerts=""
-alert_count=0
-add_alert() {
-  alert_count=$((alert_count + 1))
-  if [ -n "$alerts" ]; then alerts="$alerts; $1"; else alerts="$1"; fi
-}
-
-# SMART health -- catches a drive failing before it takes the box down. Some
-# older Apple SSDs don't expose SMART over their proprietary controller;
-# treat "not supported" as informational rather than a fault.
-for disk in $(diskutil list -plist | plutil -convert json -o - - 2>/dev/null | jq -r '.WholeDisks[]?' 2>/dev/null); do
-  smart_out=$(smartctl -H "/dev/$disk" 2>&1)
-  case "$smart_out" in
-    *FAILED*) add_alert "SMART: /dev/$disk reports FAILED" ;;
-  esac
-done
-
-# Disk space
-disk_pct=$(df -P / | awk 'NR==2 { gsub("%","",$5); print $5 }')
-[ -n "$disk_pct" ] && [ "$disk_pct" -ge 90 ] && add_alert "Disk: / is ${disk_pct}% full"
-
-# Swap -- heavy sustained swapping on a 64GB box usually means something is
-# leaking or misconfigured, and precedes the box grinding to a halt.
-swap_used=$(sysctl -n vm.swapusage 2>/dev/null | grep -o 'used = [0-9.]*M' | grep -o '[0-9.]*')
-if [ -n "$swap_used" ] && awk "BEGIN { exit !($swap_used > 8192) }"; then
-  add_alert "Memory: swap usage is ${swap_used}MB"
-fi
-
-# Thermal -- catches the aging-paste failure mode (rising idle temps) and a
-# dead/stalled fan before either causes a thermal shutdown.
-smc_out=$(powermetrics -n 1 -i 1000 --samplers smc 2>/dev/null)
-cpu_temp=$(echo "$smc_out" | grep -i "CPU die temperature" | grep -o '[0-9.]*' | head -1)
-if [ -n "$cpu_temp" ] && awk "BEGIN { exit !($cpu_temp > 85) }"; then
-  add_alert "Thermal: CPU die temperature is ${cpu_temp}C"
-fi
-fan_rpm=$(echo "$smc_out" | grep -i "Fan:" | grep -o '[0-9]*' | head -1)
-[ -n "$fan_rpm" ] && [ "$fan_rpm" -eq 0 ] && add_alert "Thermal: fan reads 0 RPM"
-
-# Power -- only fires if a UPS is connected and macOS recognizes it.
-batt_line=$(pmset -g batt 2>/dev/null | head -1)
-case "$batt_line" in
-  *"UPS Power"*) add_alert "Power: running on UPS battery, AC power lost" ;;
-esac
-
-# Service liveness
-pgrep -x BlueBubbles > /dev/null 2>&1 || add_alert "BlueBubbles is not running"
-pgrep -x Messages > /dev/null 2>&1 || add_alert "Messages.app is not running"
-
-printf '%s\tdisk=%s%%\tswap=%sMB\tcpu=%sC\tfan=%sRPM\talerts=%s\t%s\n' \
-  "$(date '+%Y-%m-%dT%H:%M:%S%z')" "${disk_pct:-?}" "${swap_used:-0}" \
-  "${cpu_temp:-?}" "${fan_rpm:-?}" "$alert_count" "${alerts:-none}" >> "$LOG"
-HEALTHSH
-chmod +x "$HEALTH_SCRIPT"
-
-HEALTH_PLIST="/Library/LaunchDaemons/com.laptop.health-check.plist"
-sudo tee "$HEALTH_PLIST" > /dev/null <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.laptop.health-check</string>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>StartInterval</key>
-    <integer>900</integer>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/zsh</string>
-        <string>$HEALTH_SCRIPT</string>
-    </array>
-</dict>
-</plist>
-EOF
-
-# LaunchDaemons load into the system domain (not gui/<uid>) and run as root.
-sudo launchctl bootout system/com.laptop.health-check 2>/dev/null || true
-sudo launchctl bootstrap system "$HEALTH_PLIST"
-
-###############################################################################
-# zsh                                                                         #
-###############################################################################
-
-shell_path="$(command -v zsh)"
-echo "Ensuring default shell is zsh at '$shell_path' ..."
-if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
-  sudo sh -c "echo $shell_path >> /etc/shells"
-fi
-if [ "$SHELL" != "$shell_path" ]; then
-  sudo chsh -s "$shell_path" "$USER"
-fi
-
-###############################################################################
-# macOS defaults -- automation-friendly only                                 #
-###############################################################################
-
-echo "Configuring macOS defaults ..."
-
-# Keep background processes alive
-defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
-
-# No iCloud document syncing
-defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
-
-# Reveal IP address, hostname, OS version when clicking clock in login window
-sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
-
-# Locale
-defaults write NSGlobalDomain AppleLanguages -array "en"
-defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
-defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
-
-# Require password immediately after screensaver
-defaults write com.apple.screensaver askForPassword -int 1
-defaults write com.apple.screensaver askForPasswordDelay -int 0
-
-# No .DS_Store on network volumes
-defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
-
-# No confirmation dialogs that could block automation
-defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
-defaults write com.apple.finder WarnOnEmptyTrash -bool false
-
-for app in "Dock" "Finder" "SystemUIServer"; do
-  killall "$app" > /dev/null 2>&1 || true
-done
-
-echo "macOS defaults configured."
-
-###############################################################################
 # TODO.md -- manual steps with live status                                   #
 ###############################################################################
 
@@ -493,7 +520,11 @@ echo "Local IP (WiFi):  $LOCAL_IP"
 echo "SSH:              ssh $USER@$LOCAL_IP"
 echo "Screen Sharing:   vnc://$LOCAL_IP"
 echo ""
-echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
+if [ -n "$_tailscale_brew" ]; then
+  echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
+else
+  echo "Tailscale: provided outside Homebrew ($_tailscale_bin) -- not managed here."
+fi
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
 echo ""
 echo "Health checks: every 15 min via LaunchDaemon (com.laptop.health-check)."
