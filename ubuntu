@@ -2,8 +2,8 @@
 
 # Welcome to the ubuntu machine script!
 # Headless Ubuntu 26.04 LTS dev box (amd64). Two jobs: a dev environment
-# reached over SSH (vim + Claude Code CLI) and a GitHub Actions self-hosted
-# runner that deploys to the Mac Pro over Tailscale. No desktop session.
+# reached over SSH (vim + Claude Code CLI) and, optionally, a GitHub Actions
+# self-hosted runner. No desktop session.
 
 # Ask for sudo upfront so we don't have to get it later
 sudo -v
@@ -239,6 +239,134 @@ fi
 sudo systemctl enable --now systemd-timesyncd
 
 ###############################################################################
+# GitHub Actions self-hosted runner -- opt in with GITHUB_RUNNER_REPO         #
+###############################################################################
+
+# Off by default. Set GITHUB_RUNNER_REPO to "owner/name" and this box registers
+# itself as a self-hosted runner for that repo, as a systemd service so it comes
+# back after a reboot. Skipped entirely otherwise -- a plain dev box has no use
+# for a 100MB+ download it will never register. Once a runner is installed here
+# the section keeps running on later passes, so re-runs stay idempotent without
+# having to re-supply anything.
+#
+# Registration tokens last about an hour, so rather than making a human paste
+# one in, the script mints its own through gh -- the endpoint wants repo admin,
+# which is inside the repo scope "gh auth login" already grants. gh also reads
+# GH_TOKEN/GITHUB_TOKEN from the environment, so a box that has not been through
+# "gh auth login" can still register by passing a personal access token that
+# way. GITHUB_RUNNER_TOKEN (or the first argument) overrides with a token minted
+# elsewhere. When none of that works the runner is left installed and
+# unregistered, with a manual step in the summary, so a later run picks up
+# exactly where this one left off.
+#
+# Outbound to GitHub only: the service holds its own connection out and gets
+# jobs dispatched over it, so there is nothing to poll and no inbound port.
+
+RUNNER_DIR="$HOME/actions-runner"
+RUNNER_REPO="${GITHUB_RUNNER_REPO:-}"
+RUNNER_TOKEN="${GITHUB_RUNNER_TOKEN:-${1:-}}"
+RUNNER_REGISTERED=0
+RUNNER_SUMMARY="not installed (set GITHUB_RUNNER_REPO to opt in)"
+
+if [ -n "$RUNNER_REPO" ] || [ -f "$RUNNER_DIR/config.sh" ]; then
+  # Jobs that deploy elsewhere run ssh from here. openssh-server pulls the
+  # client in already, but the runner's one real dependency shouldn't be left
+  # implicit.
+  if ! command -v ssh > /dev/null 2>&1; then
+    echo "Installing OpenSSH client ..."
+    sudo -E apt install -y openssh-client
+  else
+    echo "OpenSSH client already installed, skipping."
+  fi
+
+  if [ ! -f "$RUNNER_DIR/config.sh" ]; then
+    echo "Installing the GitHub Actions runner ..."
+    case "$(uname -m)" in
+      x86_64) RUNNER_ARCH="x64" ;;
+      aarch64 | arm64) RUNNER_ARCH="arm64" ;;
+      armv7l) RUNNER_ARCH="arm" ;;
+      *)
+        echo "No GitHub Actions runner build for $(uname -m)." >&2
+        exit 1
+        ;;
+    esac
+
+    # Resolved at run time rather than pinned -- the runner self-updates from
+    # whatever it lands on, so a stale pin here would be rewritten anyway.
+    RUNNER_VERSION="$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest \
+      | jq -r .tag_name | sed 's/^v//')"
+    if [ -z "$RUNNER_VERSION" ]; then
+      echo "Could not resolve the latest GitHub Actions runner release." >&2
+      exit 1
+    fi
+    RUNNER_TGZ="actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz"
+
+    mkdir -p "$RUNNER_DIR"
+    curl -fsSL -o "/tmp/$RUNNER_TGZ" \
+      "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_TGZ}"
+    tar xzf "/tmp/$RUNNER_TGZ" -C "$RUNNER_DIR"
+    rm -f "/tmp/$RUNNER_TGZ"
+
+    # .NET runtime libraries (libicu, libssl, libkrb5 ...). The runner ships its
+    # own installer, which knows the package-name drift across Ubuntu releases.
+    wait_for_apt
+    sudo -E "$RUNNER_DIR/bin/installdependencies.sh"
+  else
+    echo "GitHub Actions runner already installed, skipping download."
+  fi
+
+  # config.sh writes .runner once registration succeeds -- that file is the
+  # "already registered" marker, and keeps re-runs from minting a token they
+  # have no use for.
+  if [ -f "$RUNNER_DIR/.runner" ]; then
+    echo "GitHub Actions runner already registered, skipping configuration."
+    RUNNER_REGISTERED=1
+  elif [ -z "$RUNNER_REPO" ]; then
+    echo "GITHUB_RUNNER_REPO not set, skipping runner registration."
+  else
+    if [ -z "$RUNNER_TOKEN" ]; then
+      echo "Minting a runner registration token via gh ..."
+      # gh writes the error body to stdout when a call fails, so only its exit
+      # status can be trusted here -- take the output on faith and config.sh
+      # gets handed a JSON error blob as a registration token.
+      RUNNER_TOKEN="$(gh api -X POST \
+        "repos/$RUNNER_REPO/actions/runners/registration-token" \
+        --jq .token 2> /dev/null)" || RUNNER_TOKEN=""
+    fi
+
+    if [ -n "$RUNNER_TOKEN" ]; then
+      echo "Registering the GitHub Actions runner with $RUNNER_REPO ..."
+      (
+        cd "$RUNNER_DIR" && ./config.sh \
+          --unattended \
+          --replace \
+          --url "https://github.com/$RUNNER_REPO" \
+          --token "$RUNNER_TOKEN" \
+          --name "$(hostname)" \
+          --work _work
+      )
+      RUNNER_REGISTERED=1
+    else
+      echo "gh could not mint a registration token, skipping runner registration."
+    fi
+  fi
+
+  if [ "$RUNNER_REGISTERED" -eq 1 ]; then
+    # svc.sh writes a real unit to /etc/systemd/system, daemon-reloads and
+    # enables it. It refuses to install over an existing unit, and its status
+    # subcommand exits non-zero when there is none, which is the guard.
+    if ! (cd "$RUNNER_DIR" && sudo ./svc.sh status) > /dev/null 2>&1; then
+      echo "Installing the GitHub Actions runner as a systemd service ..."
+      (cd "$RUNNER_DIR" && sudo ./svc.sh install "$USER")
+    fi
+    (cd "$RUNNER_DIR" && sudo ./svc.sh start)
+    RUNNER_SUMMARY="registered, running as a systemd service"
+  else
+    RUNNER_SUMMARY="installed in $RUNNER_DIR, registration pending (see manual steps)"
+  fi
+fi
+
+###############################################################################
 # No desktop -- boot straight to a multi-user console                        #
 ###############################################################################
 
@@ -256,11 +384,21 @@ echo "Setup complete."
 echo ""
 echo "Local IP:  $LOCAL_IP"
 echo "SSH:       ssh $USER@$LOCAL_IP"
+echo "Runner:    $RUNNER_SUMMARY"
 echo ""
 echo "Manual steps:"
 echo "  - Set git identity: git config --global user.name \"Name\" && git config --global user.email \"you@example.com\""
 echo "  - Authenticate GitHub CLI: gh auth login"
 echo "  - Authenticate Claude Code CLI: claude (interactive TTY required)"
 echo "  - Authenticate Tailscale: sudo tailscale up"
-echo "  - Set up the GitHub Actions self-hosted runner (deploys to the Mac Pro over Tailscale)"
+if [ "$RUNNER_REGISTERED" -ne 1 ] && [ -f "$RUNNER_DIR/config.sh" ]; then
+  echo "  - Register the GitHub Actions self-hosted runner. It registers itself on"
+  echo "    the next run once GITHUB_RUNNER_REPO names the repo and gh can reach"
+  echo "    it -- so 'gh auth login' above, then re-run this script:"
+  echo "      curl -H \"Cache-Control: no-cache\" -fsS \\"
+  echo "        'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' \\"
+  echo "        | GITHUB_RUNNER_REPO=owner/name sh"
+  echo "    Add GH_TOKEN=<personal access token with repo scope> if gh is not"
+  echo "    authenticated on this box."
+fi
 echo "============================================================"
