@@ -7,7 +7,8 @@
 # Tailscale.
 # After this script completes, follow the manual steps shown in the summary.
 
-# Ask for sudo upfront so we don't have to get it later
+# Ask for sudo upfront. It stays cached only until the first brew command, so
+# root-level setup runs before Homebrew (see below).
 sudo -v
 
 # Keep using sudo so the permissions don't time out
@@ -38,6 +39,90 @@ log_run() {
 # shellcheck disable=SC2154
 trap 'ret=$?; log_run "$ret"; test $ret -ne 0 && printf "failed\n\n" >&2; exit $ret' EXIT
 set -e
+
+###############################################################################
+# Root-level setup -- runs before Homebrew                                   #
+###############################################################################
+
+# Every brew command resets sudo's cached credentials (brew.sh runs
+# `sudo --reset-timestamp`), so any sudo after the first brew call prompts for
+# the password again, and the keep-alive loop above can't prevent it. Do
+# everything that needs root here, while the password from `sudo -v` is still
+# cached.
+
+###############################################################################
+# SSH -- enable Remote Login for remote access                               #
+###############################################################################
+
+# Probe the port rather than pgrep sshd: macOS starts sshd on demand, so no
+# sshd process exists until someone connects, and loading the already-enabled
+# service fails with "Load failed: 5: Input/output error".
+nc -z localhost 22 2>/dev/null || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+
+###############################################################################
+# Screen Sharing -- enable for remote desktop                                #
+###############################################################################
+
+nc -z localhost 5900 2>/dev/null || \
+  sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+
+###############################################################################
+# Internet Sharing -- en2 (WiFi) to en0, en1 (Ethernet)                     #
+###############################################################################
+
+# com.apple.nat.plist is already configured -- just ensure the service is running
+sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.InternetSharing.plist 2>/dev/null || true
+
+###############################################################################
+# zsh                                                                         #
+###############################################################################
+
+shell_path="$(command -v zsh)"
+echo "Ensuring default shell is zsh at '$shell_path' ..."
+if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
+  sudo sh -c "echo $shell_path >> /etc/shells"
+fi
+if [ "$SHELL" != "$shell_path" ]; then
+  sudo chsh -s "$shell_path" "$USER"
+fi
+
+###############################################################################
+# macOS defaults -- automation-friendly only                                 #
+###############################################################################
+
+echo "Configuring macOS defaults ..."
+
+# Keep background processes alive
+defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
+
+# No iCloud document syncing
+defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
+
+# Reveal IP address, hostname, OS version when clicking clock in login window
+sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
+
+# Locale
+defaults write NSGlobalDomain AppleLanguages -array "en"
+defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
+defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+
+# Require password immediately after screensaver
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
+
+# No .DS_Store on network volumes
+defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
+
+# No confirmation dialogs that could block automation
+defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
+defaults write com.apple.finder WarnOnEmptyTrash -bool false
+
+for app in "Dock" "Finder" "SystemUIServer"; do
+  killall "$app" > /dev/null 2>&1 || true
+done
+
+echo "macOS defaults configured."
 
 ###############################################################################
 # Homebrew                                                                    #
@@ -207,34 +292,15 @@ if grep -qxF 'eval "$(mise activate zsh)"' "$ZPROFILE" 2>/dev/null; then
 fi
 
 ###############################################################################
-# SSH -- enable Remote Login for remote access                               #
-###############################################################################
-
-pgrep sshd > /dev/null 2>&1 || \
-  sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
-
-###############################################################################
-# Screen Sharing -- enable for remote desktop                                #
-###############################################################################
-
-nc -z localhost 5900 2>/dev/null || \
-  sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
-
-###############################################################################
 # Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
 ###############################################################################
 
 # Only when Homebrew owns tailscale; otherwise whatever installed it runs it.
+# This comes after brew, so on a Mac that uses Homebrew's tailscale sudo asks
+# for the password again here.
 if [ -n "$_tailscale_brew" ]; then
   sudo brew services start tailscale
 fi
-
-###############################################################################
-# Internet Sharing -- en2 (WiFi) to en0, en1 (Ethernet)                     #
-###############################################################################
-
-# com.apple.nat.plist is already configured -- just ensure the service is running
-sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.InternetSharing.plist 2>/dev/null || true
 
 ###############################################################################
 # poke-messages -- keep Messages.app alive for BlueBubbles                  #
@@ -279,56 +345,6 @@ launchctl bootout "gui/$(id -u)/com.user.poke-messages" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$POKE_PLIST"
 
 ###############################################################################
-# zsh                                                                         #
-###############################################################################
-
-shell_path="$(command -v zsh)"
-echo "Ensuring default shell is zsh at '$shell_path' ..."
-if ! grep "$shell_path" /etc/shells > /dev/null 2>&1; then
-  sudo sh -c "echo $shell_path >> /etc/shells"
-fi
-if [ "$SHELL" != "$shell_path" ]; then
-  sudo chsh -s "$shell_path" "$USER"
-fi
-
-###############################################################################
-# macOS defaults -- automation-friendly only                                 #
-###############################################################################
-
-echo "Configuring macOS defaults ..."
-
-# Keep background processes alive
-defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
-
-# No iCloud document syncing
-defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
-
-# Reveal IP address, hostname, OS version when clicking clock in login window
-sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
-
-# Locale
-defaults write NSGlobalDomain AppleLanguages -array "en"
-defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
-defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
-
-# Require password immediately after screensaver
-defaults write com.apple.screensaver askForPassword -int 1
-defaults write com.apple.screensaver askForPasswordDelay -int 0
-
-# No .DS_Store on network volumes
-defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
-
-# No confirmation dialogs that could block automation
-defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
-defaults write com.apple.finder WarnOnEmptyTrash -bool false
-
-for app in "Dock" "Finder" "SystemUIServer"; do
-  killall "$app" > /dev/null 2>&1 || true
-done
-
-echo "macOS defaults configured."
-
-###############################################################################
 # TODO.md -- manual steps with live status                                   #
 ###############################################################################
 
@@ -365,7 +381,11 @@ echo "Local IP (WiFi):  $LOCAL_IP"
 echo "SSH:              ssh $USER@$LOCAL_IP"
 echo "Screen Sharing:   vnc://$LOCAL_IP"
 echo ""
-echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
+if [ -n "$_tailscale_brew" ]; then
+  echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
+else
+  echo "Tailscale: provided outside Homebrew ($_tailscale_bin) -- not managed here."
+fi
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
 echo ""
 echo "Manual steps: $TODO_FILE"
