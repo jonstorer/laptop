@@ -46,12 +46,14 @@ Sets up a Mac as an iMessage bridge via BlueBubbles, which exposes Messages.app 
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-bluebubbles' | sh
 ```
 
-Push alerts (via [ntfy.sh](https://ntfy.sh)) are off unless `HEALTH_NTFY_TOPIC` names a hard-to-guess topic:
+Health-check alerts text you via BlueBubbles' own local REST API and are off until you supply the same password from its REST API setup step plus a number/email to send to:
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-bluebubbles' \
-  | HEALTH_NTFY_TOPIC=your-topic-here sh
+  | BLUEBUBBLES_PASSWORD=your-rest-api-password BLUEBUBBLES_ALERT_NUMBER=+15551234567 sh
 ```
+
+Add `HEALTH_NTFY_TOPIC=your-topic-here` (a hard-to-guess [ntfy.sh](https://ntfy.sh) topic) as a fallback for when BlueBubbles itself is the thing that's down.
 
 #### Mac — Headless Devbox (Apple Silicon)
 
@@ -169,7 +171,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 
 **Power & updates:** sleep disabled entirely (`pmset`), wake-on-LAN and auto-restart-after-power-loss enabled, and automatic macOS software updates disabled — a silent point release can strip root patches on OCLP-patched hardware and lock out remote access.
 
-**Health monitoring:** a root LaunchDaemon (`com.laptop.health-check`) runs every 15 minutes, checking SMART status, disk space, swap usage, CPU temperature/fan RPM, UPS power loss (if a UPS is connected), and whether BlueBubbles/Messages.app are up. Every run logs a summary line to `/var/log/laptop-health.log`; a failing check also pushes a notification via [ntfy.sh](https://ntfy.sh) if `HEALTH_NTFY_TOPIC` was set when the script ran (see above) — otherwise it only logs locally.
+**Health monitoring:** a root LaunchDaemon (`com.laptop.health-check`) runs every 15 minutes, checking SMART status, disk space, swap usage, CPU temperature/fan RPM, UPS power loss (if a UPS is connected), and whether BlueBubbles/Messages.app are up. Every run logs a summary line to `/var/log/laptop-health.log`. A failing check texts you via BlueBubbles' own local REST API (`localhost:1234`) if `BLUEBUBBLES_PASSWORD`/`BLUEBUBBLES_ALERT_NUMBER` were set when the script ran (see above), falling back to a push via [ntfy.sh](https://ntfy.sh) if that call fails and `HEALTH_NTFY_TOPIC` is set — which also covers BlueBubbles itself being down. Without either configured, checks only log locally. Config lives in `/etc/laptop-health.conf` (mode 600); rerunning the script updates only the variables you pass, so setting one later doesn't erase another.
 
 Sets zsh as the default shell and applies macOS defaults optimized for autonomous/headless operation.
 

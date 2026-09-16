@@ -310,20 +310,44 @@ launchctl bootstrap "gui/$(id -u)" "$POKE_PLIST"
 # drive, a full disk, heavy swapping, an overheating CPU, a stalled fan, lost
 # AC power (if a UPS is connected and macOS recognizes it), and whether
 # BlueBubbles/Messages.app are still up. Every run appends one summary line
-# to the log for trend-watching; a failing check also sends a push
-# notification via ntfy.sh (https://ntfy.sh) if a topic is configured -- ntfy
-# needs no account, just a topic name to publish/subscribe to.
+# to the log for trend-watching.
 #
-# Opt in by rerunning this script with HEALTH_NTFY_TOPIC set to a hard-to-guess
-# topic name (anyone who knows it can read your alerts):
-#   HEALTH_NTFY_TOPIC=your-topic-here sh mac-bluebubbles
-# Without it, checks still run and log locally -- see TODO.md.
+# A failing check texts you via BlueBubbles' own local REST API (it's already
+# running on this Mac for the bridge itself, so this needs no third-party
+# service): it calls http://localhost:1234/api/v1/message/text to send you an
+# iMessage as if BlueBubbles were messaging you directly. Falls back to a push
+# via ntfy.sh (https://ntfy.sh, no account needed) when that call fails --
+# which also covers the case where BlueBubbles itself is the thing that's down
+# and can't be used to report its own outage.
+#
+# Opt in by rerunning this script with:
+#   BLUEBUBBLES_PASSWORD=<same password noted in TODO.md's REST API step> \
+#   BLUEBUBBLES_ALERT_NUMBER=<your number in E.164, e.g. +15551234567, or an iCloud email> \
+#     sh mac-bluebubbles
+# Add HEALTH_NTFY_TOPIC=<a hard-to-guess topic> (anyone who knows it can read
+# your alerts) for the ntfy.sh fallback. Any subset can be set on a given run --
+# previously configured values are kept, not wiped. Without any of them,
+# checks still run and log locally -- see TODO.md.
 HEALTH_CONF="/etc/laptop-health.conf"
-if [ -n "${HEALTH_NTFY_TOPIC:-}" ]; then
-  echo "Configuring health-check alerts for ntfy.sh topic '$HEALTH_NTFY_TOPIC' ..."
-  sudo sh -c "printf 'HEALTH_NTFY_TOPIC=%s\n' '$HEALTH_NTFY_TOPIC' > '$HEALTH_CONF'"
-elif [ ! -f "$HEALTH_CONF" ]; then
-  echo "HEALTH_NTFY_TOPIC not set -- health checks will log locally only (see TODO.md)."
+
+# Updates (or adds) one KEY=value line in $HEALTH_CONF, leaving every other
+# line alone -- so setting one alert var on a later run doesn't erase another
+# one set previously. A no-op when the value is empty.
+_set_health_conf() {
+  [ -n "$2" ] || return 0
+  sudo touch "$HEALTH_CONF"
+  sudo chmod 600 "$HEALTH_CONF"
+  sudo sh -c "grep -vE '^$1=' '$HEALTH_CONF' 2>/dev/null > '$HEALTH_CONF.tmp'; printf '%s=%s\n' '$1' '$2' >> '$HEALTH_CONF.tmp'; mv '$HEALTH_CONF.tmp' '$HEALTH_CONF'"
+}
+
+_set_health_conf BLUEBUBBLES_PASSWORD "${BLUEBUBBLES_PASSWORD:-}"
+_set_health_conf BLUEBUBBLES_ALERT_NUMBER "${BLUEBUBBLES_ALERT_NUMBER:-}"
+_set_health_conf HEALTH_NTFY_TOPIC "${HEALTH_NTFY_TOPIC:-}"
+
+if [ -n "${BLUEBUBBLES_PASSWORD:-}${BLUEBUBBLES_ALERT_NUMBER:-}${HEALTH_NTFY_TOPIC:-}" ]; then
+  echo "Health-check alert config updated in $HEALTH_CONF."
+elif [ ! -s "$HEALTH_CONF" ]; then
+  echo "No health-check alert channel configured yet -- checks will log locally only (see TODO.md)."
 fi
 
 HEALTH_SCRIPT="$HOME/Scripts/health-check.sh"
@@ -393,9 +417,23 @@ printf '%s\tdisk=%s%%\tswap=%sMB\tcpu=%sC\tfan=%sRPM\talerts=%s\n' \
   "$(date '+%Y-%m-%dT%H:%M:%S%z')" "${disk_pct:-?}" "${swap_used:-0}" \
   "${cpu_temp:-?}" "${fan_rpm:-?}" "$alert_count" >> "$LOG"
 
-if [ -n "$alerts" ] && [ -n "${HEALTH_NTFY_TOPIC:-}" ]; then
-  curl -fsS -H "Title: mac-bluebubbles health alert ($(hostname))" -H "Priority: high" \
-    -d "$(hostname):$alerts" "https://ntfy.sh/$HEALTH_NTFY_TOPIC" > /dev/null 2>&1 || true
+# Text yourself via BlueBubbles' own local REST API first -- no third-party
+# service needed for the common case. Falls back to ntfy.sh (if configured)
+# when that call fails, which also covers BlueBubbles itself being down.
+if [ -n "$alerts" ]; then
+  msg="$(hostname):$alerts"
+  sent=0
+  if [ -n "${BLUEBUBBLES_PASSWORD:-}" ] && [ -n "${BLUEBUBBLES_ALERT_NUMBER:-}" ]; then
+    chat_guid="iMessage;-;${BLUEBUBBLES_ALERT_NUMBER}"
+    body=$(jq -n --arg guid "$chat_guid" --arg tmp "health-$(date +%s)" --arg msg "$msg" \
+      '{chatGuid: $guid, tempGuid: $tmp, message: $msg, method: "apple-script"}')
+    curl -fsS -m 10 -X POST "http://localhost:${BLUEBUBBLES_PORT:-1234}/api/v1/message/text?password=${BLUEBUBBLES_PASSWORD}" \
+      -H 'Content-Type: application/json' -d "$body" > /dev/null 2>&1 && sent=1
+  fi
+  if [ "$sent" -eq 0 ] && [ -n "${HEALTH_NTFY_TOPIC:-}" ]; then
+    curl -fsS -m 10 -H "Title: mac-bluebubbles health alert ($(hostname))" -H "Priority: high" \
+      -d "$msg" "https://ntfy.sh/$HEALTH_NTFY_TOPIC" > /dev/null 2>&1
+  fi
 fi
 HEALTHSH
 chmod +x "$HEALTH_SCRIPT"
@@ -483,7 +521,7 @@ _ok() { sh -c "$1" > /dev/null 2>&1 && printf 'x' || printf ' '; }
 
 _TS=$(_ok "tailscale status")
 _BB=$(_ok "pgrep -x BlueBubbles")
-_HEALTH_ALERTS=$(_ok "test -f '$HEALTH_CONF'")
+_HEALTH_ALERTS=$(_ok "test -s '$HEALTH_CONF'")
 _GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
 TODO_FILE="$HOME/TODO.md"
 
@@ -497,7 +535,7 @@ _Last updated: $_GENERATED — rerun mac-bluebubbles to refresh status._
 - [ ] Approve Automation permission — macOS will prompt when osascript first accesses Messages.app; allow in System Settings → Privacy & Security → Automation
 - [ ] Sign into iMessage — Messages.app → Settings → iMessage
 - [ ] On the machine connecting to this bridge, supply the BlueBubbles server URL and password
-- [$_HEALTH_ALERTS] Configure health-check push alerts: rerun with \`HEALTH_NTFY_TOPIC=your-topic-here sh mac-bluebubbles\` (pick a hard-to-guess topic), or edit $HEALTH_CONF by hand. Without it, checks still log to /var/log/laptop-health.log every 15 minutes but nothing pages you.
+- [$_HEALTH_ALERTS] Configure health-check alerts: rerun with \`BLUEBUBBLES_PASSWORD=... BLUEBUBBLES_ALERT_NUMBER=+1... sh mac-bluebubbles\` to text yourself via BlueBubbles (reuse the REST API password from the step above), optionally adding \`HEALTH_NTFY_TOPIC=your-topic-here\` as a fallback for when BlueBubbles itself is down. Or edit $HEALTH_CONF by hand. Without either, checks still log to /var/log/laptop-health.log every 15 minutes but nothing pages you.
 EOF
 
 ###############################################################################
@@ -517,10 +555,10 @@ echo ""
 echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
 echo ""
-if [ -f "$HEALTH_CONF" ]; then
-  _HEALTH_SUMMARY="push alerts via ntfy.sh (topic configured)"
+if [ -s "$HEALTH_CONF" ]; then
+  _HEALTH_SUMMARY="alerts configured -- see $HEALTH_CONF"
 else
-  _HEALTH_SUMMARY="log-only -- no push topic configured, see TODO.md"
+  _HEALTH_SUMMARY="log-only -- no alert channel configured, see TODO.md"
 fi
 echo "Health checks: every 15 min via LaunchDaemon (com.laptop.health-check)."
 echo "  SMART, disk space, swap, CPU temp/fan, UPS power, service liveness."
