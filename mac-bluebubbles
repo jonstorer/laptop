@@ -70,6 +70,24 @@ else
   _bundle_flags="--no-upgrade"
 fi
 
+# Adopt any cask below that's already present but wasn't installed via
+# Homebrew (e.g. an app installed by hand) instead of failing the whole bundle.
+export HOMEBREW_CASK_OPTS="--adopt"
+
+# --adopt only covers casks. Formulae have no equivalent: if something other
+# than Homebrew already put a tailscale CLI in the bin dir (e.g. the Tailscale
+# app's "Install CLI"), brew can't link its own and fails the bundle. Leave
+# tailscale to whatever installed it -- Homebrew's links point into Cellar,
+# so anything else at that path is someone else's.
+_tailscale_bin="$(brew --prefix)/bin/tailscale"
+if { [ -e "$_tailscale_bin" ] || [ -L "$_tailscale_bin" ]; } &&
+   ! readlink "$_tailscale_bin" 2>/dev/null | grep -q '/Cellar/tailscale/'; then
+  echo "Found a non-Homebrew tailscale at $_tailscale_bin -- skipping Homebrew's ..."
+  _tailscale_brew=""
+else
+  _tailscale_brew='brew "tailscale"'
+fi
+
 # shellcheck disable=SC2086
 brew bundle $_bundle_flags --file=- <<EOF
 # GUI apps -- for physical access / debugging
@@ -88,7 +106,7 @@ brew "yq"
 # Networking
 brew "curl"
 brew "wget"
-brew "tailscale"
+$_tailscale_brew
 
 # Terminal multiplexer
 brew "tmux"
@@ -177,7 +195,10 @@ nc -z localhost 5900 2>/dev/null || \
 # Tailscale -- start daemon (run 'sudo tailscale up' to authenticate)       #
 ###############################################################################
 
-sudo brew services start tailscale
+# Only when Homebrew owns tailscale; otherwise whatever installed it runs it.
+if [ -n "$_tailscale_brew" ]; then
+  sudo brew services start tailscale
+fi
 
 ###############################################################################
 # Internet Sharing -- en2 (WiFi) to en0, en1 (Ethernet)                     #

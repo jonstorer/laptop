@@ -142,9 +142,9 @@ Sets zsh as the default shell and applies macOS defaults (including disabling Ti
 
 Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Silicon and Intel x86_64 (including the 2013 Mac Pro).
 
-**Casks:** alfred, bluebubbles, google-chrome, iterm2, rectangle
+**Casks:** alfred, bluebubbles, google-chrome, iterm2, rectangle (adopted if already installed outside Homebrew)
 
-**CLI tools:** jq, yq, curl, wget, tailscale, tmux
+**CLI tools:** jq, yq, curl, wget, tailscale, tmux. Homebrew's tailscale is skipped if a non-Homebrew `tailscale` CLI (e.g. from the Tailscale app) is already in Homebrew's bin dir.
 
 **Intel upgrades:** Homebrew ships no bottles for Intel macOS, so on Intel the script installs missing formulae but doesn't upgrade installed ones (that means rebuilding them from source); casks still upgrade.
 
