@@ -63,7 +63,7 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 #### Ubuntu
 
 Headless Ubuntu 26.04 LTS dev box, no desktop. Two jobs: a dev environment reached over SSH (vim + Claude
-Code CLI) and a GitHub Actions self-hosted runner that deploys to another machine over Tailscale.
+Code CLI) and, optionally, a GitHub Actions self-hosted runner.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
@@ -71,6 +71,13 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 or
 ```sh
 wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
+```
+
+The runner is off unless `GITHUB_RUNNER_REPO` names a repo as `owner/name`:
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' \
+  | GITHUB_RUNNER_REPO=owner/name sh
 ```
 
 #### Raspberry Pi
@@ -188,8 +195,7 @@ Sets zsh as the default shell and applies macOS defaults.
 #### Ubuntu
 
 Headless Ubuntu 26.04 LTS dev box, no desktop session (boots to `multi-user.target`). Two jobs: a dev
-environment reached over SSH, and a GitHub Actions self-hosted runner that deploys to another machine over
-Tailscale (runner install itself is a manual step — see below).
+environment reached over SSH, and an optional GitHub Actions self-hosted runner.
 
 **Packages:** build-essential, ca-certificates, curl, git, gnupg, htop, jq, pipx, python3-pip, ripgrep, tmux, trash-cli, vim, wget, yq, zsh (apt)
 
@@ -207,11 +213,15 @@ Tailscale (runner install itself is a manual step — see below).
 
 **SSH:** openssh-server enabled and started; generates `~/.ssh/id_ed25519` if not present
 
+**GitHub Actions runner (optional):** skipped entirely unless `GITHUB_RUNNER_REPO` is set to `owner/name`, or a runner is already installed from an earlier run. When on: the latest [actions/runner](https://github.com/actions/runner) release for this architecture, unpacked into `~/actions-runner`, registered against that repo and installed as a systemd service (`svc.sh install`/`start`) so it survives a reboot. Outbound to GitHub only — no inbound port. openssh-client is checked too, since jobs that deploy elsewhere `ssh` out from here.
+
+Registration tokens last about an hour, so the script mints its own via `gh api`, which needs the `repo` scope `gh auth login` already grants. `gh` also reads `GH_TOKEN`/`GITHUB_TOKEN` from the environment, so a personal access token works on a box that hasn't been through `gh auth login`. `GITHUB_RUNNER_TOKEN` (or the first argument) overrides with a token minted elsewhere. If none of that works the runner is left installed and unregistered, with a manual step in the summary — a later run picks up from there
+
 **Shell:** zsh
 
 Sets `systemd-timesyncd` running and the default boot target to `multi-user.target`.
 
-Manual steps printed at the end: git identity, `gh auth login`, `claude` auth, `tailscale up`, and setting up the GitHub Actions self-hosted runner.
+Manual steps printed at the end: git identity, `gh auth login`, `claude` auth, `tailscale up`, and — only when a runner is installed but could not register itself — registering it.
 
 #### Ubuntu (WSL2)
 
