@@ -148,9 +148,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 
 **Intel upgrades:** Homebrew ships no bottles for Intel macOS, so on Intel the script installs missing formulae but doesn't upgrade installed ones (that means rebuilding them from source); casks still upgrade.
 
-**Node.js:** [mise](https://mise.jdx.dev) is installed from its prebuilt binary (Homebrew's formula builds from rust + llvm on Intel) and activated for login shells, but no global version is pinned — this box is a generic deploy target, so whatever is deployed brings its own version via `mise.toml`/`.nvmrc`. Any Homebrew-installed `node` is uninstalled so it can't shadow mise's shims on `PATH`.
-
-**Data services:** postgresql and valkey (a Redis-compatible server on port 6379; Homebrew's redis needs rust + llvm to build on Intel), started as root LaunchDaemons via `sudo brew services` so they survive a reboot with no one logged in. Note that the `postgresql` formula is an alias for the current major (postgresql@18 today) and floats on major releases — a major bump needs a manual data-directory migration.
+**Nothing else:** apps that use the bridge run elsewhere and reach it over Tailscale. The script removes anything left from when this Mac was also a deploy target: it stops and uninstalls Homebrew's postgresql, valkey, redis and mise (then `brew autoremove`), runs `mise implode` on a prebuilt mise in `~/.local/bin`, and drops the `mise activate` line from `~/.zprofile.local`. Database data directories under Homebrew's `var` are left for you to delete.
 
 **SSH:** Remote Login enabled for remote access.
 

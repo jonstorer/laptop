@@ -2,11 +2,9 @@
 
 # Welcome to the mac-bluebubbles machine script!
 # Sets up macOS as an iMessage bridge via BlueBubbles, which exposes
-# Messages.app via a web API for other machines to connect to.
-# Also provisions the box as a generic Node app deploy target: mise for
-# runtime versions, plus Postgres and Valkey (a Redis-compatible server). It
-# deliberately knows nothing about which app gets deployed here or what its
-# processes are called.
+# Messages.app via a web API for other machines to connect to. It runs
+# nothing else -- apps that use the bridge live elsewhere and reach it over
+# Tailscale.
 # After this script completes, follow the manual steps shown in the summary.
 
 # Ask for sudo upfront so we don't have to get it later
@@ -110,15 +108,6 @@ $_tailscale_brew
 
 # Terminal multiplexer
 brew "tmux"
-
-# Data services -- available to whatever gets deployed to this box.
-# "postgresql" is an alias for the current major (postgresql@18 today); it
-# floats on major releases, so a major bump needs a manual data-dir migration.
-# Valkey instead of Redis: Homebrew's redis needs rust (and so llvm) to build,
-# which is unbuildable-in-practice on Intel. Valkey speaks the same protocol
-# on the same port (6379) and builds with plain make.
-brew "postgresql"
-brew "valkey"
 EOF
 
 if [ "$(uname -m)" = "arm64" ]; then
@@ -128,54 +117,44 @@ else
 fi
 
 ###############################################################################
-# Node -- provided by mise, so remove any Homebrew node that shadows it      #
+# Cleanup -- remove the deploy-target setup this Mac briefly had             #
 ###############################################################################
 
-# A brew-linked node/node@NN puts binaries in the Homebrew bin dir, which sits
-# ahead of mise's shims on PATH and wins. Uninstall any that are already on
-# this Mac -- everything running here gets its Node from mise, so nothing
-# depends on a Homebrew one. The loop only visits formulae brew actually
-# reports, so re-running is a no-op.
-for _node_formula in $(brew list --formula 2>/dev/null | grep -E '^node(@[0-9.]+)?$' || true); do
-  echo "Uninstalling Homebrew $_node_formula -- Node comes from mise ..."
-  brew uninstall "$_node_formula"
+# This Mac used to also be a Node app deploy target (mise, Postgres, Valkey /
+# Redis). That moved off it: Homebrew builds everything from source on Intel,
+# which made the extra services too brittle to keep here. Undo that setup.
+# Every step checks before acting, so re-running is a no-op. Database data
+# directories under $(brew --prefix)/var are left alone -- delete them by hand.
+for _formula in $(brew list --formula 2>/dev/null | grep -E '^(postgresql(@[0-9]+)?|valkey|redis|mise)$' || true); do
+  echo "Removing Homebrew $_formula -- this Mac only runs BlueBubbles ..."
+  sudo brew services stop "$_formula" > /dev/null 2>&1 || true
+  brew services stop "$_formula" > /dev/null 2>&1 || true
+  brew uninstall --force "$_formula"
+  _removed_formulae=1
 done
 
-###############################################################################
-# mise -- runtime version manager                                            #
-###############################################################################
-
-# This box is a generic deploy target, so it does not choose a Node version:
-# whatever gets deployed pins its own via mise.toml/.nvmrc and mise resolves
-# it. Installed from mise's prebuilt binary rather than Homebrew, whose mise
-# formula builds from source (rust + llvm) on Intel.
-export PATH="$HOME/.local/bin:$PATH"
-if ! command -v mise > /dev/null 2>&1; then
-  echo "Installing mise ..."
-  curl -fsSL https://mise.run | sh
+# Drop dependencies nothing needs any more (only when something was removed,
+# so a clean run doesn't prune formulae for unrelated reasons).
+if [ -n "${_removed_formulae:-}" ]; then
+  brew autoremove
 fi
 
-if command -v mise > /dev/null 2>&1; then
-  echo "Activating mise for login shells ..."
-
-  ZPROFILE="$HOME/.zprofile.local"
-  if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
-    # shellcheck disable=SC2016
-    printf '\nexport PATH="$HOME/.local/bin:$PATH"\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
-  fi
-
-  # Shell init (.zshrc) is managed by dotfiles - do not modify
+# mise installed from its prebuilt binary lands in ~/.local/bin; implode removes
+# the binary plus every runtime it installed.
+if [ -x "$HOME/.local/bin/mise" ]; then
+  echo "Removing mise ..."
+  "$HOME/.local/bin/mise" implode --yes
 fi
 
-###############################################################################
-# Postgres and Valkey -- data services for deployed apps                     #
-###############################################################################
-
-# Started the same way as tailscale below: a root LaunchDaemon, so they come
-# back after a reboot without anyone logging in. Re-running is a no-op.
-echo "Starting Postgres and Valkey ..."
-sudo brew services start postgresql
-sudo brew services start valkey
+# Take out the line earlier versions of this script added to activate mise.
+# grep exits 1 when it filters out every line, which is still a success here.
+ZPROFILE="$HOME/.zprofile.local"
+# shellcheck disable=SC2016
+if grep -qxF 'eval "$(mise activate zsh)"' "$ZPROFILE" 2>/dev/null; then
+  echo "Removing mise activation from $ZPROFILE ..."
+  grep -vxF 'eval "$(mise activate zsh)"' "$ZPROFILE" > "$ZPROFILE.tmp" || true
+  mv "$ZPROFILE.tmp" "$ZPROFILE"
+fi
 
 ###############################################################################
 # SSH -- enable Remote Login for remote access                               #
@@ -328,23 +307,9 @@ EOF
 
 LOCAL_IP="$(ipconfig getifaddr en2 2>/dev/null || echo 'unknown')"
 
-# Same port-probe idiom used for Screen Sharing above. A service that was just
-# started may still be opening its socket, hence "starting" rather than "down".
-if nc -z localhost 5432 2>/dev/null; then
-  _PG_STATUS="listening on 5432"
-else
-  _PG_STATUS="starting -- check 'sudo brew services list'"
-fi
-if nc -z localhost 6379 2>/dev/null; then
-  _VALKEY_STATUS="listening on 6379"
-else
-  _VALKEY_STATUS="starting -- check 'sudo brew services list'"
-fi
-
 echo ""
 echo "============================================================"
-echo "Setup complete. This Mac is an iMessage bridge via BlueBubbles"
-echo "and a Node app deploy target."
+echo "Setup complete. This Mac is an iMessage bridge via BlueBubbles."
 echo ""
 echo "Local IP (WiFi):  $LOCAL_IP"
 echo "SSH:              ssh $USER@$LOCAL_IP"
@@ -352,12 +317,6 @@ echo "Screen Sharing:   vnc://$LOCAL_IP"
 echo ""
 echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
-echo ""
-echo "Deploy target:"
-echo "  mise:     installed and activated for login shells. No Node version is"
-echo "            pinned here -- deploys bring their own via mise.toml/.nvmrc."
-echo "  Postgres: $_PG_STATUS (brew services, postgresql)"
-echo "  Valkey:   $_VALKEY_STATUS (brew services, valkey; Redis-compatible)"
 echo ""
 echo "Manual steps: $TODO_FILE"
 echo "============================================================"
