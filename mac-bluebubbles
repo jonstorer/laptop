@@ -54,9 +54,8 @@ set -e
 # SSH -- enable Remote Login for remote access                               #
 ###############################################################################
 
-# Probe the port rather than pgrep sshd: macOS starts sshd on demand, so no
-# sshd process exists until someone connects, and loading the already-enabled
-# service fails with "Load failed: 5: Input/output error".
+# Probe the port rather than pgrep sshd: macOS starts sshd on demand, so run
+# at the console with nobody connected there's no sshd process to find.
 nc -z localhost 22 2>/dev/null || \
   sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist
 
@@ -68,11 +67,21 @@ nc -z localhost 5900 2>/dev/null || \
   sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
 
 ###############################################################################
-# Internet Sharing -- en2 (WiFi) to en0, en1 (Ethernet)                     #
+# Cleanup -- remove the old Internet Sharing setup                           #
 ###############################################################################
 
-# com.apple.nat.plist is already configured -- just ensure the service is running
-sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.InternetSharing.plist 2>/dev/null || true
+# This Mac used to share its Wi-Fi to the Ethernet ports. That's gone: nothing
+# is plugged into Ethernet, and the service this script loaded
+# (com.apple.InternetSharing.plist) no longer exists on current macOS, so the
+# load only printed "Load failed: 5". Remove the launchd daemon an older
+# version of this setup installed to rewrite the sharing config. Turn sharing
+# back on in System Settings -> General -> Sharing if it's ever needed.
+ICS_PLIST="/Library/LaunchDaemons/ai.openclaw.internet-sharing.plist"
+if [ -f "$ICS_PLIST" ]; then
+  echo "Removing the old Internet Sharing daemon ..."
+  sudo launchctl bootout system "$ICS_PLIST" 2>/dev/null || true
+  sudo rm -f "$ICS_PLIST" /usr/local/sbin/openclaw-ics
+fi
 
 ###############################################################################
 # zsh                                                                         #
