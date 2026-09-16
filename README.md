@@ -62,8 +62,9 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 #### Ubuntu
 
-Headless Ubuntu 26.04 LTS dev box, no desktop. Two jobs: a dev environment reached over SSH (vim + Claude
-Code CLI) and, optionally, a GitHub Actions self-hosted runner.
+Headless Ubuntu 26.04 LTS dev box, no desktop. Three jobs: a dev environment reached over SSH (vim +
+Claude Code CLI), a Node app deploy target (Docker, Postgres, Redis), and, optionally, a GitHub Actions
+self-hosted runner.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
@@ -71,6 +72,13 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 or
 ```sh
 wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
+```
+
+Nothing app-specific gets created unless `DEPLOY_ENVIRONMENTS` names environments (space-separated):
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' \
+  | DEPLOY_ENVIRONMENTS="staging production" sh
 ```
 
 The runner is off unless `GITHUB_RUNNER_REPO` names a repo as `owner/name`:
@@ -204,20 +212,22 @@ Sets zsh as the default shell and applies macOS defaults.
 
 #### Ubuntu
 
-Headless Ubuntu 26.04 LTS dev box, no desktop session (boots to `multi-user.target`). Two jobs: a dev
-environment reached over SSH, and an optional GitHub Actions self-hosted runner.
+Headless Ubuntu 26.04 LTS dev box, no desktop session (boots to `multi-user.target`). Three jobs: a dev
+environment reached over SSH, a Node app deploy target, and an optional GitHub Actions self-hosted runner.
 
 **Packages:** build-essential, ca-certificates, curl, git, gnupg, htop, jq, pipx, python3-pip, ripgrep, tmux, trash-cli, vim, wget, yq, zsh (apt)
 
 **GitHub CLI:** via official apt repository
 
-**Node.js:** [mise](https://mise.jdx.dev) re-resolves to the latest LTS on every run and sets it as the global default
+**Node.js:** [mise](https://mise.jdx.dev) re-resolves to the latest LTS on every run and sets it as the global default. This is only the fallback — a deployed app pins its own version via `mise.toml`/`.nvmrc` and mise resolves it, the same as the old Mac deploy target.
 
 **Claude Code CLI:** installed via official apt repository; authenticate with `claude` after install
 
 **Browser:** Google Chrome stable (via Google's official apt repository) — headless browser automation for Claude Code
 
 **Docker:** Docker CE (cli, containerd, buildx, compose) via Docker's official apt repository; the service is enabled and the current user is added to the `docker` group — log out and back in (or `newgrp docker`) before running `docker` without sudo
+
+**Data services:** postgresql and redis-server (apt), started as systemd services so they survive a reboot. Both are pinned to listen on localhost only — Postgres via `pg_conftool ... set listen_addresses localhost`, Redis via `bind 127.0.0.1 -::1` in `redis.conf` — even though that's already apt's packaged default, and only restart the service when the setting actually changed. One Postgres role and database is created per environment named in `DEPLOY_ENVIRONMENTS` (space-separated, e.g. `staging production`; unset by default, so a plain dev box gets the services with nothing app-specific on top), each owning its own database so environments can't read each other's data. A role's password is generated once, when its role is first created, and written to `~/.laptop/secrets/postgres-<env>.env` (mode 600) as a ready-to-use `DATABASE_URL` — never printed to the terminal, and never touched again on later runs so it can't invalidate something already using it. Redis is shared by every environment with no per-environment split, since apps already namespace their own keys.
 
 **Tailscale:** installed and enabled; run `sudo tailscale up` to authenticate
 

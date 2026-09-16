@@ -1,9 +1,10 @@
 #!/bin/sh
 
 # Welcome to the ubuntu machine script!
-# Headless Ubuntu 26.04 LTS dev box (amd64). Two jobs: a dev environment
-# reached over SSH (vim + Claude Code CLI) and, optionally, a GitHub Actions
-# self-hosted runner. No desktop session.
+# Headless Ubuntu 26.04 LTS dev box (amd64). Three jobs: a dev environment
+# reached over SSH (vim + Claude Code CLI), a Node app deploy target (Docker,
+# Postgres, Redis) for whatever gets deployed here, and, optionally, a GitHub
+# Actions self-hosted runner. No desktop session.
 
 # Ask for sudo upfront so we don't have to get it later
 sudo -v
@@ -184,6 +185,113 @@ if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
   echo "Adding $USER to the docker group ..."
   sudo usermod -aG docker "$USER"
   echo "Log out and back in (or run 'newgrp docker') to use docker without sudo."
+fi
+
+###############################################################################
+# Postgres and Redis -- data services for deployed apps                      #
+###############################################################################
+
+# This box is a generic deploy target, so it does not choose which app runs
+# here -- see the mise section above. One Postgres and one Redis instance
+# serve every environment that gets deployed. Both come from apt (not
+# Homebrew's compile-from-source problem on the old Mac target), start on
+# boot via systemd, and listen on localhost only.
+
+wait_for_apt
+sudo -E apt install -y postgresql redis-server openssl
+
+sudo systemctl enable --now postgresql
+sudo systemctl enable --now redis-server
+
+# Postgres already defaults to listen_addresses = 'localhost' on Ubuntu, but
+# pin it explicitly with pg_conftool (version-agnostic; it edits whichever
+# cluster apt just created) rather than trust that default to hold across
+# releases. Only restart if something actually changed.
+PG_VERSION="$(pg_lsclusters -h | awk '{print $1; exit}')"
+if [ -n "$PG_VERSION" ]; then
+  _pg_listen_before="$(sudo pg_conftool "$PG_VERSION" main show listen_addresses 2>/dev/null || true)"
+  sudo pg_conftool "$PG_VERSION" main set listen_addresses localhost
+  _pg_listen_after="$(sudo pg_conftool "$PG_VERSION" main show listen_addresses 2>/dev/null || true)"
+  if [ "$_pg_listen_before" != "$_pg_listen_after" ]; then
+    sudo systemctl restart postgresql
+  fi
+else
+  echo "Could not determine the Postgres cluster version -- skipping listen_addresses check." >&2
+fi
+
+# Same idea for Redis: apt's default redis.conf already binds to loopback
+# only, but make it explicit and idempotent rather than rely on the package
+# default. sed edits in place; only restart if the file actually changed.
+REDIS_CONF="/etc/redis/redis.conf"
+if [ -f "$REDIS_CONF" ]; then
+  _redis_conf_before="$(sudo md5sum "$REDIS_CONF")"
+  sudo sed -i \
+    -e 's/^bind .*/bind 127.0.0.1 -::1/' \
+    -e 's/^# *bind .*/bind 127.0.0.1 -::1/' \
+    "$REDIS_CONF"
+  grep -qE '^bind ' "$REDIS_CONF" || echo 'bind 127.0.0.1 -::1' | sudo tee -a "$REDIS_CONF" > /dev/null
+  _redis_conf_after="$(sudo md5sum "$REDIS_CONF")"
+  if [ "$_redis_conf_before" != "$_redis_conf_after" ]; then
+    sudo systemctl restart redis-server
+  fi
+fi
+
+# One Postgres role and database per environment, so environments can't read
+# each other's data. This script deliberately knows nothing about which
+# environments exist -- it only knows the names, taken from DEPLOY_ENVIRONMENTS
+# (space-separated, e.g. "staging production"). Redis gets no such split:
+# apps already namespace their keys by environment, so one shared instance is
+# enough. Unset by default, so a plain dev box installs Postgres and Redis but
+# creates nothing app-specific.
+#
+# A role's password is generated once, on the run that creates the role, and
+# never touched again -- so re-running doesn't invalidate a DATABASE_URL
+# something is already using. It's written to a file only the owner can read
+# rather than echoed to the terminal, since script output tends to end up in
+# scrollback, logs, or a transcript.
+DEPLOY_SECRETS_DIR="$HOME/.laptop/secrets"
+_deploy_env_summary="none configured (set DEPLOY_ENVIRONMENTS to opt in)"
+
+if [ -n "${DEPLOY_ENVIRONMENTS:-}" ]; then
+  mkdir -p "$DEPLOY_SECRETS_DIR"
+  chmod 700 "$DEPLOY_SECRETS_DIR"
+  _deploy_env_list=""
+
+  for _env in $DEPLOY_ENVIRONMENTS; do
+    case "$_env" in
+      [a-z][a-z0-9_]*) ;;
+      *)
+        echo "Skipping '$_env' from DEPLOY_ENVIRONMENTS -- must start with a" \
+          "lowercase letter and contain only lowercase letters, digits, and" \
+          "underscores." >&2
+        continue
+        ;;
+    esac
+    _deploy_env_list="$_deploy_env_list $_env"
+
+    _role_exists="$(sudo -u postgres psql -tAc \
+      "SELECT 1 FROM pg_roles WHERE rolname = '$_env'")"
+    if [ "$_role_exists" = "1" ]; then
+      echo "Postgres role '$_env' already exists, skipping."
+    else
+      echo "Creating Postgres role and database '$_env' ..."
+      _pg_password="$(openssl rand -hex 24)"
+      sudo -u postgres psql -v ON_ERROR_STOP=1 \
+        -c "CREATE ROLE \"$_env\" WITH LOGIN PASSWORD '$_pg_password'" \
+        -c "CREATE DATABASE \"$_env\" OWNER \"$_env\""
+      _cred_file="$DEPLOY_SECRETS_DIR/postgres-$_env.env"
+      cat > "$_cred_file" <<EOF
+DATABASE_URL=postgresql://$_env:$_pg_password@localhost:5432/$_env
+EOF
+      chmod 600 "$_cred_file"
+    fi
+  done
+
+  if [ -n "$_deploy_env_list" ]; then
+    _deploy_env_summary="$(echo "$_deploy_env_list" | sed 's/^ *//')"
+    _deploy_env_summary="postgres role+database per environment:$_deploy_env_summary"
+    _deploy_env_summary="$_deploy_env_summary (credentials in $DEPLOY_SECRETS_DIR)"
+  fi
 fi
 
 ###############################################################################
@@ -385,6 +493,14 @@ echo ""
 echo "Local IP:  $LOCAL_IP"
 echo "SSH:       ssh $USER@$LOCAL_IP"
 echo "Runner:    $RUNNER_SUMMARY"
+echo ""
+echo "Deploy target:"
+echo "  mise:     installed and activated for login shells. No Node version is"
+echo "            pinned for deploys -- they bring their own via"
+echo "            mise.toml/.nvmrc; the global LTS pin is only a fallback."
+echo "  Postgres: listening on localhost:5432. $_deploy_env_summary"
+echo "  Redis:    listening on localhost:6379, shared by every environment --"
+echo "            apps namespace their own keys."
 echo ""
 echo "Manual steps:"
 echo "  - Set git identity: git config --global user.name \"Name\" && git config --global user.email \"you@example.com\""
