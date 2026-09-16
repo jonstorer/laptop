@@ -94,16 +94,17 @@ EOF
 brew upgrade
 
 ###############################################################################
-# Node -- provided by mise, so no Homebrew node may shadow its shims         #
+# Node -- provided by mise, so remove any Homebrew node that shadows it      #
 ###############################################################################
 
 # A brew-linked node/node@NN puts binaries in the Homebrew bin dir, which sits
-# ahead of mise's shims on PATH and wins. Unlink any that are already on this
-# Mac. Unlink rather than uninstall: other formulae may depend on node, and
-# unlinking is enough to clear it off PATH.
+# ahead of mise's shims on PATH and wins. Uninstall any that are already on
+# this Mac -- everything running here gets its Node from mise, so nothing
+# depends on a Homebrew one. The loop only visits formulae brew actually
+# reports, so re-running is a no-op.
 for _node_formula in $(brew list --formula 2>/dev/null | grep -E '^node(@[0-9.]+)?$' || true); do
-  echo "Unlinking Homebrew $_node_formula so mise's shims win on PATH ..."
-  brew unlink "$_node_formula" > /dev/null 2>&1 || true
+  echo "Uninstalling Homebrew $_node_formula -- Node comes from mise ..."
+  brew uninstall "$_node_formula"
 done
 
 ###############################################################################
