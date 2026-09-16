@@ -142,7 +142,7 @@ Sets zsh as the default shell and applies macOS defaults (including disabling Ti
 
 Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Silicon and Intel x86_64 (including the 2013 Mac Pro).
 
-**Casks:** alfred, bluebubbles, google-chrome, iterm2, rectangle (adopted if already installed outside Homebrew)
+**Casks:** bluebubbles, and iterm2 for logging in at the box itself; it is otherwise managed over SSH. Both are adopted if already installed outside Homebrew. Every other Homebrew-installed cask (e.g. alfred, rectangle, google-chrome, slack) is uninstalled.
 
 **CLI tools:** jq, yq, curl, wget, tailscale, tmux. Homebrew's tailscale is skipped if a non-Homebrew `tailscale` CLI (e.g. from the Tailscale app) is already in Homebrew's bin dir.
 
