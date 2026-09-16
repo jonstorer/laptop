@@ -74,11 +74,13 @@ or
 wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
 ```
 
-Nothing app-specific gets created unless `DEPLOY_ENVIRONMENTS` names environments (space-separated):
+Postgres and Redis default to ports 5433/6380, off their standard ports so a docker-compose dev stack can
+still use 5432/6379 on the same box. Override with `DEPLOY_POSTGRES_PORT`/`DEPLOY_REDIS_PORT` if that ever
+collides with something else instead:
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' \
-  | DEPLOY_ENVIRONMENTS="staging production" sh
+  | DEPLOY_POSTGRES_PORT=5434 DEPLOY_REDIS_PORT=6381 sh
 ```
 
 The runner is off unless `GITHUB_RUNNER_REPO` names a repo as `owner/name`:
@@ -227,7 +229,7 @@ environment reached over SSH, a Node app deploy target, and an optional GitHub A
 
 **Docker:** Docker CE (cli, containerd, buildx, compose) via Docker's official apt repository; the service is enabled and the current user is added to the `docker` group — log out and back in (or `newgrp docker`) before running `docker` without sudo
 
-**Data services:** postgresql and redis-server (apt), started as systemd services so they survive a reboot. Both are pinned to listen on localhost only — Postgres via `pg_conftool ... set listen_addresses localhost`, Redis via `bind 127.0.0.1 -::1` in `redis.conf` — even though that's already apt's packaged default, and only restart the service when the setting actually changed. One Postgres role and database is created per environment named in `DEPLOY_ENVIRONMENTS` (space-separated, e.g. `staging production`; unset by default, so a plain dev box gets the services with nothing app-specific on top), each owning its own database so environments can't read each other's data. A role's password is generated once, when its role is first created, and written to `~/.laptop/secrets/postgres-<env>.env` (mode 600) as a ready-to-use `DATABASE_URL` — never printed to the terminal, and never touched again on later runs so it can't invalidate something already using it. Redis is shared by every environment with no per-environment split, since apps already namespace their own keys.
+**Data services:** postgresql and redis-server (apt), started as systemd services so they survive a reboot. Both listen on localhost only — Postgres via `pg_conftool ... set listen_addresses localhost`, Redis via `bind 127.0.0.1 -::1` in `redis.conf` — and both run on non-standard ports, 5433 and 6380 by default (`DEPLOY_POSTGRES_PORT`/`DEPLOY_REDIS_PORT` to override), so an app's own docker-compose dev stack can still bind the standard 5432/6379 on the same box without colliding. The script only restarts a service when a setting actually changed. It creates no roles, databases, or users — those are hand-created per environment (e.g. `sudo -u postgres psql -c "CREATE USER staging WITH LOGIN PASSWORD '...'"`), and whatever else an environment needs comes from setup scripts in the app repo being deployed. Redis is one shared instance for every environment, since apps already namespace their own keys.
 
 **Tailscale:** installed and enabled; run `sudo tailscale up` to authenticate
 
