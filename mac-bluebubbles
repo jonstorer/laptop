@@ -3,6 +3,9 @@
 # Welcome to the mac-bluebubbles machine script!
 # Sets up macOS as an iMessage bridge via BlueBubbles, which exposes
 # Messages.app via a web API for other machines to connect to.
+# Also provisions the box as a generic Node app deploy target: mise for
+# runtime versions, plus Postgres and Redis. It deliberately knows nothing
+# about which app gets deployed here or what its processes are called.
 # After this script completes, follow the manual steps shown in the summary.
 
 # Ask for sudo upfront so we don't have to get it later
@@ -77,9 +80,60 @@ brew "tailscale"
 
 # Terminal multiplexer
 brew "tmux"
+
+# Runtime version manager -- Node comes from mise, never from Homebrew
+brew "mise"
+
+# Data services -- available to whatever gets deployed to this box.
+# "postgresql" is an alias for the current major (postgresql@18 today); it
+# floats on major releases, so a major bump needs a manual data-dir migration.
+brew "postgresql"
+brew "redis"
 EOF
 
 brew upgrade
+
+###############################################################################
+# Node -- provided by mise, so no Homebrew node may shadow its shims         #
+###############################################################################
+
+# A brew-linked node/node@NN puts binaries in the Homebrew bin dir, which sits
+# ahead of mise's shims on PATH and wins. Unlink any that are already on this
+# Mac. Unlink rather than uninstall: other formulae may depend on node, and
+# unlinking is enough to clear it off PATH.
+for _node_formula in $(brew list --formula 2>/dev/null | grep -E '^node(@[0-9.]+)?$' || true); do
+  echo "Unlinking Homebrew $_node_formula so mise's shims win on PATH ..."
+  brew unlink "$_node_formula" > /dev/null 2>&1 || true
+done
+
+###############################################################################
+# mise -- runtime version manager                                            #
+###############################################################################
+
+# This box is a generic deploy target, so it does not choose a Node version:
+# whatever gets deployed pins its own via mise.toml/.nvmrc and mise resolves
+# it. All this script does is put mise's shims on PATH for login shells.
+if command -v mise > /dev/null 2>&1; then
+  echo "Activating mise for login shells ..."
+
+  ZPROFILE="$HOME/.zprofile.local"
+  if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
+    # shellcheck disable=SC2016
+    printf '\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
+  fi
+
+  # Shell init (.zshrc) is managed by dotfiles - do not modify
+fi
+
+###############################################################################
+# Postgres and Redis -- data services for deployed apps                      #
+###############################################################################
+
+# Started the same way as tailscale below: a root LaunchDaemon, so they come
+# back after a reboot without anyone logging in. Re-running is a no-op.
+echo "Starting Postgres and Redis ..."
+sudo brew services start postgresql
+sudo brew services start redis
 
 ###############################################################################
 # SSH -- enable Remote Login for remote access                               #
@@ -229,9 +283,23 @@ EOF
 
 LOCAL_IP="$(ipconfig getifaddr en2 2>/dev/null || echo 'unknown')"
 
+# Same port-probe idiom used for Screen Sharing above. A service that was just
+# started may still be opening its socket, hence "starting" rather than "down".
+if nc -z localhost 5432 2>/dev/null; then
+  _PG_STATUS="listening on 5432"
+else
+  _PG_STATUS="starting -- check 'sudo brew services list'"
+fi
+if nc -z localhost 6379 2>/dev/null; then
+  _REDIS_STATUS="listening on 6379"
+else
+  _REDIS_STATUS="starting -- check 'sudo brew services list'"
+fi
+
 echo ""
 echo "============================================================"
-echo "Setup complete. This Mac is an iMessage bridge via BlueBubbles."
+echo "Setup complete. This Mac is an iMessage bridge via BlueBubbles"
+echo "and a Node app deploy target."
 echo ""
 echo "Local IP (WiFi):  $LOCAL_IP"
 echo "SSH:              ssh $USER@$LOCAL_IP"
@@ -239,6 +307,12 @@ echo "Screen Sharing:   vnc://$LOCAL_IP"
 echo ""
 echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
+echo ""
+echo "Deploy target:"
+echo "  mise:     installed and activated for login shells. No Node version is"
+echo "            pinned here -- deploys bring their own via mise.toml/.nvmrc."
+echo "  Postgres: $_PG_STATUS (brew services, postgresql)"
+echo "  Redis:    $_REDIS_STATUS (brew services, redis)"
 echo ""
 echo "Manual steps: $TODO_FILE"
 echo "============================================================"

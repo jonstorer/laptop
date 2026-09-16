@@ -137,7 +137,11 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 
 **Casks:** alfred, bluebubbles, google-chrome, iterm2, rectangle
 
-**CLI tools:** jq, yq, curl, wget, tailscale, tmux
+**CLI tools:** jq, yq, curl, wget, tailscale, tmux, mise
+
+**Node.js:** [mise](https://mise.jdx.dev) is installed and activated for login shells, but no global version is pinned — this box is a generic deploy target, so whatever is deployed brings its own version via `mise.toml`/`.nvmrc`. Any Homebrew-installed `node` is unlinked so it can't shadow mise's shims on `PATH`.
+
+**Data services:** postgresql and redis, started as root LaunchDaemons via `sudo brew services` so they survive a reboot with no one logged in. Note that the `postgresql` formula is an alias for the current major (postgresql@18 today) and floats on major releases — a major bump needs a manual data-directory migration.
 
 **SSH:** Remote Login enabled for remote access.
 
