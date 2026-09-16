@@ -40,10 +40,17 @@ curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonsto
 
 #### Mac — BlueBubbles iMessage Bridge (Apple Silicon or Intel x86_64)
 
-Sets up a Mac as an iMessage bridge via BlueBubbles, which exposes Messages.app via a web API for other machines to connect to over Tailscale.
+Sets up a Mac as an iMessage bridge via BlueBubbles, which exposes Messages.app via a web API for other machines to connect to over Tailscale. Also disables sleep and automatic macOS updates (both cause silent downtime on a headless box), and installs a health-check LaunchDaemon that watches SMART status, disk space, swap, CPU temp/fan, UPS power, and service liveness every 15 minutes, logging to `/var/log/laptop-health.log`.
 
 ```sh
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-bluebubbles' | sh
+```
+
+Push alerts (via [ntfy.sh](https://ntfy.sh)) are off unless `HEALTH_NTFY_TOPIC` names a hard-to-guess topic:
+
+```sh
+curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-bluebubbles' \
+  | HEALTH_NTFY_TOPIC=your-topic-here sh
 ```
 
 #### Mac — Headless Devbox (Apple Silicon)
@@ -146,7 +153,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 
 **Casks:** alfred, iterm2 and rectangle for logging in at the box itself; it is otherwise managed over SSH. They are adopted if already installed outside Homebrew. Every other Homebrew-installed cask (e.g. google-chrome, slack) is uninstalled, except a bluebubbles cask left by earlier runs.
 
-**CLI tools:** jq, yq, curl, wget, tailscale, tmux. Homebrew's tailscale is skipped if a non-Homebrew `tailscale` CLI (e.g. from the Tailscale app) is already in Homebrew's bin dir.
+**CLI tools:** jq, yq, curl, wget, tailscale, smartmontools, tmux. Homebrew's tailscale is skipped if a non-Homebrew `tailscale` CLI (e.g. from the Tailscale app) is already in Homebrew's bin dir.
 
 **Intel upgrades:** Homebrew ships no bottles for Intel macOS, so on Intel the script installs missing formulae but doesn't upgrade installed ones (that means rebuilding them from source); casks still upgrade.
 
@@ -159,6 +166,10 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 **Tailscale:** installed and daemon started; run `sudo tailscale up` to authenticate.
 
 **BlueBubbles keep-alive:** a LaunchAgent (`poke-messages`) pokes Messages.app every 5 minutes to keep it responsive for BlueBubbles.
+
+**Power & updates:** sleep disabled entirely (`pmset`), wake-on-LAN and auto-restart-after-power-loss enabled, and automatic macOS software updates disabled — a silent point release can strip root patches on OCLP-patched hardware and lock out remote access.
+
+**Health monitoring:** a root LaunchDaemon (`com.laptop.health-check`) runs every 15 minutes, checking SMART status, disk space, swap usage, CPU temperature/fan RPM, UPS power loss (if a UPS is connected), and whether BlueBubbles/Messages.app are up. Every run logs a summary line to `/var/log/laptop-health.log`; a failing check also pushes a notification via [ntfy.sh](https://ntfy.sh) if `HEALTH_NTFY_TOPIC` was set when the script ran (see above) — otherwise it only logs locally.
 
 Sets zsh as the default shell and applies macOS defaults optimized for autonomous/headless operation.
 

@@ -104,6 +104,9 @@ brew "curl"
 brew "wget"
 $_tailscale_brew
 
+# Health monitoring -- SMART status for the health-check LaunchDaemon below
+brew "smartmontools"
+
 # Terminal multiplexer
 brew "tmux"
 EOF
@@ -237,6 +240,26 @@ fi
 sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.InternetSharing.plist 2>/dev/null || true
 
 ###############################################################################
+# Power & Software Update -- lock down settings that cause silent downtime   #
+###############################################################################
+
+# Sleeping or a silent point-release both take a headless box offline with no
+# one around to notice. Disable sleep outright (a headless box has no display
+# to protect and no battery to save), enable wake-on-LAN as a safety net in
+# case sleep is ever re-enabled, and auto-restart after a power interruption.
+echo "Tuning pmset for unattended operation ..."
+sudo pmset -a sleep 0 displaysleep 0 disksleep 0 powernap 0 womp 1 autorestart 1
+
+# A background point update can silently strip root patches on OCLP-patched
+# hardware and lock out remote access -- disable automatic checks/downloads so
+# updates only happen when explicitly run by hand.
+echo "Disabling automatic macOS software updates ..."
+sudo softwareupdate --schedule off > /dev/null 2>&1 || true
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticCheckEnabled -bool false
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticDownload -bool false
+sudo defaults write /Library/Preferences/com.apple.commerce AutoUpdate -bool false
+
+###############################################################################
 # poke-messages -- keep Messages.app alive for BlueBubbles                  #
 ###############################################################################
 
@@ -277,6 +300,130 @@ EOF
 # Idempotent load: unload if already running, then reload
 launchctl bootout "gui/$(id -u)/com.user.poke-messages" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$POKE_PLIST"
+
+###############################################################################
+# health-check -- warn before hardware trouble takes the box down            #
+###############################################################################
+
+# Runs as root every 15 minutes (needs root for smartctl/powermetrics) and
+# checks the things most likely to precede an unattended failure: a failing
+# drive, a full disk, heavy swapping, an overheating CPU, a stalled fan, lost
+# AC power (if a UPS is connected and macOS recognizes it), and whether
+# BlueBubbles/Messages.app are still up. Every run appends one summary line
+# to the log for trend-watching; a failing check also sends a push
+# notification via ntfy.sh (https://ntfy.sh) if a topic is configured -- ntfy
+# needs no account, just a topic name to publish/subscribe to.
+#
+# Opt in by rerunning this script with HEALTH_NTFY_TOPIC set to a hard-to-guess
+# topic name (anyone who knows it can read your alerts):
+#   HEALTH_NTFY_TOPIC=your-topic-here sh mac-bluebubbles
+# Without it, checks still run and log locally -- see TODO.md.
+HEALTH_CONF="/etc/laptop-health.conf"
+if [ -n "${HEALTH_NTFY_TOPIC:-}" ]; then
+  echo "Configuring health-check alerts for ntfy.sh topic '$HEALTH_NTFY_TOPIC' ..."
+  sudo sh -c "printf 'HEALTH_NTFY_TOPIC=%s\n' '$HEALTH_NTFY_TOPIC' > '$HEALTH_CONF'"
+elif [ ! -f "$HEALTH_CONF" ]; then
+  echo "HEALTH_NTFY_TOPIC not set -- health checks will log locally only (see TODO.md)."
+fi
+
+HEALTH_SCRIPT="$HOME/Scripts/health-check.sh"
+mkdir -p "$HOME/Scripts"
+cat > "$HEALTH_SCRIPT" <<'HEALTHSH'
+#!/bin/zsh
+
+# Homebrew's bin isn't on root's PATH by default (jq/smartctl come from brew).
+if [ -d /opt/homebrew/bin ]; then
+  PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+else
+  PATH="/usr/local/bin:/usr/local/sbin:$PATH"
+fi
+export PATH
+
+LOG="/var/log/laptop-health.log"
+CONF="/etc/laptop-health.conf"
+[ -f "$CONF" ] && . "$CONF"
+
+alerts=""
+add_alert() { alerts="$alerts
+- $1"; }
+
+# SMART health -- catches a drive failing before it takes the box down. Some
+# older Apple SSDs don't expose SMART over their proprietary controller;
+# treat "not supported" as informational rather than a fault.
+for disk in $(diskutil list -plist | plutil -convert json -o - - 2>/dev/null | jq -r '.WholeDisks[]?' 2>/dev/null); do
+  smart_out=$(smartctl -H "/dev/$disk" 2>&1)
+  case "$smart_out" in
+    *FAILED*) add_alert "SMART: /dev/$disk reports FAILED" ;;
+  esac
+done
+
+# Disk space
+disk_pct=$(df -P / | awk 'NR==2 { gsub("%","",$5); print $5 }')
+[ -n "$disk_pct" ] && [ "$disk_pct" -ge 90 ] && add_alert "Disk: / is ${disk_pct}% full"
+
+# Swap -- heavy sustained swapping on a 64GB box usually means something is
+# leaking or misconfigured, and precedes the box grinding to a halt.
+swap_used=$(sysctl -n vm.swapusage 2>/dev/null | grep -o 'used = [0-9.]*M' | grep -o '[0-9.]*')
+if [ -n "$swap_used" ] && awk "BEGIN { exit !($swap_used > 8192) }"; then
+  add_alert "Memory: swap usage is ${swap_used}MB"
+fi
+
+# Thermal -- catches the aging-paste failure mode (rising idle temps) and a
+# dead/stalled fan before either causes a thermal shutdown.
+smc_out=$(powermetrics -n 1 -i 1000 --samplers smc 2>/dev/null)
+cpu_temp=$(echo "$smc_out" | grep -i "CPU die temperature" | grep -o '[0-9.]*' | head -1)
+if [ -n "$cpu_temp" ] && awk "BEGIN { exit !($cpu_temp > 85) }"; then
+  add_alert "Thermal: CPU die temperature is ${cpu_temp}C"
+fi
+fan_rpm=$(echo "$smc_out" | grep -i "Fan:" | grep -o '[0-9]*' | head -1)
+[ -n "$fan_rpm" ] && [ "$fan_rpm" -eq 0 ] && add_alert "Thermal: fan reads 0 RPM"
+
+# Power -- only fires if a UPS is connected and macOS recognizes it.
+batt_line=$(pmset -g batt 2>/dev/null | head -1)
+case "$batt_line" in
+  *"UPS Power"*) add_alert "Power: running on UPS battery, AC power lost" ;;
+esac
+
+# Service liveness
+pgrep -x BlueBubbles > /dev/null 2>&1 || add_alert "BlueBubbles is not running"
+pgrep -x Messages > /dev/null 2>&1 || add_alert "Messages.app is not running"
+
+alert_count=$(echo "$alerts" | grep -c '^- ')
+printf '%s\tdisk=%s%%\tswap=%sMB\tcpu=%sC\tfan=%sRPM\talerts=%s\n' \
+  "$(date '+%Y-%m-%dT%H:%M:%S%z')" "${disk_pct:-?}" "${swap_used:-0}" \
+  "${cpu_temp:-?}" "${fan_rpm:-?}" "$alert_count" >> "$LOG"
+
+if [ -n "$alerts" ] && [ -n "${HEALTH_NTFY_TOPIC:-}" ]; then
+  curl -fsS -H "Title: mac-bluebubbles health alert ($(hostname))" -H "Priority: high" \
+    -d "$(hostname):$alerts" "https://ntfy.sh/$HEALTH_NTFY_TOPIC" > /dev/null 2>&1 || true
+fi
+HEALTHSH
+chmod +x "$HEALTH_SCRIPT"
+
+HEALTH_PLIST="/Library/LaunchDaemons/com.laptop.health-check.plist"
+sudo tee "$HEALTH_PLIST" > /dev/null <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.laptop.health-check</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>$HEALTH_SCRIPT</string>
+    </array>
+</dict>
+</plist>
+EOF
+
+# LaunchDaemons load into the system domain (not gui/<uid>) and run as root.
+sudo launchctl bootout system/com.laptop.health-check 2>/dev/null || true
+sudo launchctl bootstrap system "$HEALTH_PLIST"
 
 ###############################################################################
 # zsh                                                                         #
@@ -336,6 +483,7 @@ _ok() { sh -c "$1" > /dev/null 2>&1 && printf 'x' || printf ' '; }
 
 _TS=$(_ok "tailscale status")
 _BB=$(_ok "pgrep -x BlueBubbles")
+_HEALTH_ALERTS=$(_ok "test -f '$HEALTH_CONF'")
 _GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
 TODO_FILE="$HOME/TODO.md"
 
@@ -349,6 +497,7 @@ _Last updated: $_GENERATED — rerun mac-bluebubbles to refresh status._
 - [ ] Approve Automation permission — macOS will prompt when osascript first accesses Messages.app; allow in System Settings → Privacy & Security → Automation
 - [ ] Sign into iMessage — Messages.app → Settings → iMessage
 - [ ] On the machine connecting to this bridge, supply the BlueBubbles server URL and password
+- [$_HEALTH_ALERTS] Configure health-check push alerts: rerun with \`HEALTH_NTFY_TOPIC=your-topic-here sh mac-bluebubbles\` (pick a hard-to-guess topic), or edit $HEALTH_CONF by hand. Without it, checks still log to /var/log/laptop-health.log every 15 minutes but nothing pages you.
 EOF
 
 ###############################################################################
@@ -367,6 +516,15 @@ echo "Screen Sharing:   vnc://$LOCAL_IP"
 echo ""
 echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
+echo ""
+if [ -f "$HEALTH_CONF" ]; then
+  _HEALTH_SUMMARY="push alerts via ntfy.sh (topic configured)"
+else
+  _HEALTH_SUMMARY="log-only -- no push topic configured, see TODO.md"
+fi
+echo "Health checks: every 15 min via LaunchDaemon (com.laptop.health-check)."
+echo "  SMART, disk space, swap, CPU temp/fan, UPS power, service liveness."
+echo "  Log: /var/log/laptop-health.log ($_HEALTH_SUMMARY)"
 echo ""
 echo "Manual steps: $TODO_FILE"
 echo "============================================================"
