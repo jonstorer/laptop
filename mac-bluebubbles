@@ -88,12 +88,12 @@ fi
 
 # shellcheck disable=SC2086
 brew bundle $_bundle_flags --file=- <<EOF
-# The bridge itself
-cask "bluebubbles"
-
-# Terminal for logging in at the box itself; otherwise it's managed over SSH.
-# Keep this list in sync with _keep_casks in the cleanup below.
+# GUI apps for logging in at the box itself; otherwise it's managed over SSH.
+# BlueBubbles itself is installed below, not here. Keep this list in sync with
+# _keep_casks in the cleanup below.
+cask "alfred"
 cask "iterm2"
+cask "rectangle"
 
 # Config manipulation
 brew "jq"
@@ -115,14 +115,47 @@ else
 fi
 
 ###############################################################################
+# BlueBubbles -- installed from its GitHub release, not Homebrew             #
+###############################################################################
+
+# Homebrew disabled the bluebubbles cask on 2026-09-01 because the app isn't
+# notarized (fails Gatekeeper), so brew refuses to install it. Install the
+# same release the cask pinned, checked against the cask's checksums. A Mac
+# that already has the app (including one installed by the old cask) is left
+# alone. BlueBubbles updates itself from inside the app.
+BLUEBUBBLES_APP="/Applications/BlueBubbles.app"
+if [ ! -d "$BLUEBUBBLES_APP" ]; then
+  _bb_version="1.9.9"
+  if [ "$(uname -m)" = "arm64" ]; then
+    _bb_dmg="BlueBubbles-$_bb_version-arm64.dmg"
+    _bb_sha256="fafd650c883f52e7494a6625e45249f2144d197378a4d57143ccf6198bb2e862"
+  else
+    _bb_dmg="BlueBubbles-$_bb_version.dmg"
+    _bb_sha256="9681e65f60214a6a95f3bd12b57bd4cc8ad6d8f58cd9c1d8811b2a4606ad7c04"
+  fi
+
+  echo "Installing BlueBubbles $_bb_version ..."
+  _bb_tmp="$(mktemp -d)"
+  curl -fsSL -o "$_bb_tmp/$_bb_dmg" \
+    "https://github.com/BlueBubblesApp/bluebubbles-server/releases/download/v$_bb_version/$_bb_dmg"
+  echo "$_bb_sha256  $_bb_tmp/$_bb_dmg" | shasum -a 256 -c -
+  hdiutil attach -nobrowse -readonly -mountpoint "$_bb_tmp/mnt" "$_bb_tmp/$_bb_dmg" > /dev/null
+  ditto "$_bb_tmp/mnt/BlueBubbles.app" "$BLUEBUBBLES_APP"
+  hdiutil detach "$_bb_tmp/mnt" > /dev/null
+  rm -rf "$_bb_tmp"
+fi
+
+###############################################################################
 # Cleanup -- remove casks this Mac doesn't need                              #
 ###############################################################################
 
-# The Mac is managed over SSH, so the only apps it needs are BlueBubbles and
-# a terminal. Uninstall every other Homebrew-managed cask (e.g. alfred,
-# rectangle, google-chrome, slack). Apps installed outside Homebrew aren't
-# listed by brew and are left alone. Re-running is a no-op.
-_keep_casks="bluebubbles iterm2"
+# The Mac is managed over SSH, so it keeps BlueBubbles plus a few apps for
+# logging in at the box. Uninstall every other Homebrew-managed cask (e.g.
+# google-chrome, slack). Apps installed outside Homebrew aren't listed by brew
+# and are left alone. Re-running is a no-op. bluebubbles stays on the list for
+# Macs where the old cask installed it; brew warns it's disabled but the app
+# keeps working.
+_keep_casks="alfred bluebubbles iterm2 rectangle"
 for _cask in $(brew list --cask 2>/dev/null || true); do
   case " $_keep_casks " in
     *" $_cask "*) ;;
