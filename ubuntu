@@ -1,9 +1,10 @@
 #!/bin/sh
 
 # Welcome to the ubuntu machine script!
-# Headless Ubuntu 26.04 LTS dev box (amd64). Two jobs: a dev environment
-# reached over SSH (vim + Claude Code CLI) and, optionally, a GitHub Actions
-# self-hosted runner. No desktop session.
+# Headless Ubuntu 26.04 LTS dev box (amd64). Three jobs: a dev environment
+# reached over SSH (vim + Claude Code CLI), a Node app deploy target (Docker,
+# Postgres, Redis) for whatever gets deployed here, and, optionally, a GitHub
+# Actions self-hosted runner. No desktop session.
 
 # Ask for sudo upfront so we don't have to get it later
 sudo -v
@@ -184,6 +185,73 @@ if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
   echo "Adding $USER to the docker group ..."
   sudo usermod -aG docker "$USER"
   echo "Log out and back in (or run 'newgrp docker') to use docker without sudo."
+fi
+
+###############################################################################
+# Postgres and Redis -- data services for deployed apps                      #
+###############################################################################
+
+# This box is a generic deploy target, so it does not choose which app runs
+# here -- see the mise section above, and it does not create any
+# app-specific roles or databases either. That's hand-done (per-environment
+# users, created with a plain `sudo -u postgres psql`) and then handled by
+# whatever setup scripts live in the app repo being deployed. All this script
+# does is get one Postgres and one Redis instance running, on localhost only,
+# for that hand-done setup to build on. Both come from apt (not Homebrew's
+# compile-from-source problem on the old Mac target) and start on boot via
+# systemd.
+#
+# Docker also runs on this box (see above), and an app's own docker-compose
+# stack commonly maps a local-dev Postgres/Redis onto the standard ports
+# (5432/6379) on the host. Put these two off the standard ports instead, so
+# the two never collide and no app repo has to change its compose file.
+# Override with DEPLOY_POSTGRES_PORT / DEPLOY_REDIS_PORT if these defaults
+# ever collide with something else instead.
+DEPLOY_POSTGRES_PORT="${DEPLOY_POSTGRES_PORT:-5433}"
+DEPLOY_REDIS_PORT="${DEPLOY_REDIS_PORT:-6380}"
+
+wait_for_apt
+sudo -E apt install -y postgresql redis-server
+
+sudo systemctl enable --now postgresql
+sudo systemctl enable --now redis-server
+
+# Postgres already defaults to listen_addresses = 'localhost' on Ubuntu, but
+# pin it (and the port) explicitly with pg_conftool -- version-agnostic, it
+# edits whichever cluster apt just created -- rather than trust the default
+# to hold across releases. Only restart if something actually changed.
+PG_VERSION="$(pg_lsclusters -h | awk '{print $1; exit}')"
+if [ -n "$PG_VERSION" ]; then
+  _pg_conf_before="$(sudo pg_conftool "$PG_VERSION" main show listen_addresses 2>/dev/null)|$(sudo pg_conftool "$PG_VERSION" main show port 2>/dev/null)"
+  sudo pg_conftool "$PG_VERSION" main set listen_addresses localhost
+  sudo pg_conftool "$PG_VERSION" main set port "$DEPLOY_POSTGRES_PORT"
+  _pg_conf_after="$(sudo pg_conftool "$PG_VERSION" main show listen_addresses 2>/dev/null)|$(sudo pg_conftool "$PG_VERSION" main show port 2>/dev/null)"
+  if [ "$_pg_conf_before" != "$_pg_conf_after" ]; then
+    sudo systemctl restart postgresql
+  fi
+else
+  echo "Could not determine the Postgres cluster version -- skipping listen_addresses/port check." >&2
+fi
+
+# Same idea for Redis: apt's default redis.conf already binds to loopback
+# only, but pin the bind address and port explicitly and idempotently rather
+# than rely on the package default. Only touches lines that are already an
+# active (uncommented) directive, so it never turns a commented-out example
+# in the file's own documentation into a live one; appends a line if neither
+# directive is present at all. Only restart if the file actually changed.
+REDIS_CONF="/etc/redis/redis.conf"
+if [ -f "$REDIS_CONF" ]; then
+  _redis_conf_before="$(sudo md5sum "$REDIS_CONF")"
+  sudo sed -i \
+    -e 's/^bind .*/bind 127.0.0.1 -::1/' \
+    -e "s/^port .*/port $DEPLOY_REDIS_PORT/" \
+    "$REDIS_CONF"
+  grep -qE '^bind ' "$REDIS_CONF" || echo 'bind 127.0.0.1 -::1' | sudo tee -a "$REDIS_CONF" > /dev/null
+  grep -qE '^port ' "$REDIS_CONF" || echo "port $DEPLOY_REDIS_PORT" | sudo tee -a "$REDIS_CONF" > /dev/null
+  _redis_conf_after="$(sudo md5sum "$REDIS_CONF")"
+  if [ "$_redis_conf_before" != "$_redis_conf_after" ]; then
+    sudo systemctl restart redis-server
+  fi
 fi
 
 ###############################################################################
@@ -385,6 +453,18 @@ echo ""
 echo "Local IP:  $LOCAL_IP"
 echo "SSH:       ssh $USER@$LOCAL_IP"
 echo "Runner:    $RUNNER_SUMMARY"
+echo ""
+echo "Deploy target:"
+echo "  mise:     installed and activated for login shells. No Node version is"
+echo "            pinned for deploys -- they bring their own via"
+echo "            mise.toml/.nvmrc; the global LTS pin is only a fallback."
+echo "  Postgres: listening on localhost:$DEPLOY_POSTGRES_PORT (off 5432 so a"
+echo "            docker-compose dev stack can still use it)."
+echo "  Redis:    listening on localhost:$DEPLOY_REDIS_PORT (off 6379, same"
+echo "            reason), shared by every environment -- apps namespace"
+echo "            their own keys."
+echo "  Users:    none created here -- add one per environment by hand, e.g."
+echo "            sudo -u postgres psql -c \"CREATE USER staging WITH LOGIN PASSWORD '...'\""
 echo ""
 echo "Manual steps:"
 echo "  - Set git identity: git config --global user.name \"Name\" && git config --global user.email \"you@example.com\""
