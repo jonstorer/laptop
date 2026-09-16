@@ -144,11 +144,13 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 
 **Casks:** alfred, bluebubbles, google-chrome, iterm2, rectangle
 
-**CLI tools:** jq, yq, curl, wget, tailscale, tmux, mise
+**CLI tools:** jq, yq, curl, wget, tailscale, tmux
 
-**Node.js:** [mise](https://mise.jdx.dev) is installed and activated for login shells, but no global version is pinned — this box is a generic deploy target, so whatever is deployed brings its own version via `mise.toml`/`.nvmrc`. Any Homebrew-installed `node` is uninstalled so it can't shadow mise's shims on `PATH`.
+**Intel upgrades:** Homebrew ships no bottles for Intel macOS, so on Intel the script installs missing formulae but doesn't upgrade installed ones (that means rebuilding them from source); casks still upgrade.
 
-**Data services:** postgresql and redis, started as root LaunchDaemons via `sudo brew services` so they survive a reboot with no one logged in. Note that the `postgresql` formula is an alias for the current major (postgresql@18 today) and floats on major releases — a major bump needs a manual data-directory migration.
+**Node.js:** [mise](https://mise.jdx.dev) is installed from its prebuilt binary (Homebrew's formula builds from rust + llvm on Intel) and activated for login shells, but no global version is pinned — this box is a generic deploy target, so whatever is deployed brings its own version via `mise.toml`/`.nvmrc`. Any Homebrew-installed `node` is uninstalled so it can't shadow mise's shims on `PATH`.
+
+**Data services:** postgresql and valkey (a Redis-compatible server on port 6379; Homebrew's redis needs rust + llvm to build on Intel), started as root LaunchDaemons via `sudo brew services` so they survive a reboot with no one logged in. Note that the `postgresql` formula is an alias for the current major (postgresql@18 today) and floats on major releases — a major bump needs a manual data-directory migration.
 
 **SSH:** Remote Login enabled for remote access.
 

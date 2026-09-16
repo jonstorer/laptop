@@ -4,8 +4,9 @@
 # Sets up macOS as an iMessage bridge via BlueBubbles, which exposes
 # Messages.app via a web API for other machines to connect to.
 # Also provisions the box as a generic Node app deploy target: mise for
-# runtime versions, plus Postgres and Redis. It deliberately knows nothing
-# about which app gets deployed here or what its processes are called.
+# runtime versions, plus Postgres and Valkey (a Redis-compatible server). It
+# deliberately knows nothing about which app gets deployed here or what its
+# processes are called.
 # After this script completes, follow the manual steps shown in the summary.
 
 # Ask for sudo upfront so we don't have to get it later
@@ -59,7 +60,18 @@ fi
 echo "Updating Homebrew ..."
 brew update --force
 
-brew bundle --file=- <<EOF
+# Homebrew ships no bottles for Intel macOS, so every outdated formula is
+# rebuilt from source -- and some (anything needing rust or llvm) take hours
+# or break outright. On Intel, install what's missing but leave installed
+# formulae alone; casks are prebuilt binaries, so those still upgrade.
+if [ "$(uname -m)" = "arm64" ]; then
+  _bundle_flags=""
+else
+  _bundle_flags="--no-upgrade"
+fi
+
+# shellcheck disable=SC2086
+brew bundle $_bundle_flags --file=- <<EOF
 # GUI apps -- for physical access / debugging
 cask "alfred"
 cask "bluebubbles"
@@ -81,17 +93,21 @@ brew "tailscale"
 # Terminal multiplexer
 brew "tmux"
 
-# Runtime version manager -- Node comes from mise, never from Homebrew
-brew "mise"
-
 # Data services -- available to whatever gets deployed to this box.
 # "postgresql" is an alias for the current major (postgresql@18 today); it
 # floats on major releases, so a major bump needs a manual data-dir migration.
+# Valkey instead of Redis: Homebrew's redis needs rust (and so llvm) to build,
+# which is unbuildable-in-practice on Intel. Valkey speaks the same protocol
+# on the same port (6379) and builds with plain make.
 brew "postgresql"
-brew "redis"
+brew "valkey"
 EOF
 
-brew upgrade
+if [ "$(uname -m)" = "arm64" ]; then
+  brew upgrade
+else
+  brew upgrade --cask
+fi
 
 ###############################################################################
 # Node -- provided by mise, so remove any Homebrew node that shadows it      #
@@ -113,28 +129,35 @@ done
 
 # This box is a generic deploy target, so it does not choose a Node version:
 # whatever gets deployed pins its own via mise.toml/.nvmrc and mise resolves
-# it. All this script does is put mise's shims on PATH for login shells.
+# it. Installed from mise's prebuilt binary rather than Homebrew, whose mise
+# formula builds from source (rust + llvm) on Intel.
+export PATH="$HOME/.local/bin:$PATH"
+if ! command -v mise > /dev/null 2>&1; then
+  echo "Installing mise ..."
+  curl -fsSL https://mise.run | sh
+fi
+
 if command -v mise > /dev/null 2>&1; then
   echo "Activating mise for login shells ..."
 
   ZPROFILE="$HOME/.zprofile.local"
   if ! grep -qF 'mise activate' "$ZPROFILE" 2>/dev/null; then
     # shellcheck disable=SC2016
-    printf '\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
+    printf '\nexport PATH="$HOME/.local/bin:$PATH"\neval "$(mise activate zsh)"\n' >> "$ZPROFILE"
   fi
 
   # Shell init (.zshrc) is managed by dotfiles - do not modify
 fi
 
 ###############################################################################
-# Postgres and Redis -- data services for deployed apps                      #
+# Postgres and Valkey -- data services for deployed apps                     #
 ###############################################################################
 
 # Started the same way as tailscale below: a root LaunchDaemon, so they come
 # back after a reboot without anyone logging in. Re-running is a no-op.
-echo "Starting Postgres and Redis ..."
+echo "Starting Postgres and Valkey ..."
 sudo brew services start postgresql
-sudo brew services start redis
+sudo brew services start valkey
 
 ###############################################################################
 # SSH -- enable Remote Login for remote access                               #
@@ -292,9 +315,9 @@ else
   _PG_STATUS="starting -- check 'sudo brew services list'"
 fi
 if nc -z localhost 6379 2>/dev/null; then
-  _REDIS_STATUS="listening on 6379"
+  _VALKEY_STATUS="listening on 6379"
 else
-  _REDIS_STATUS="starting -- check 'sudo brew services list'"
+  _VALKEY_STATUS="starting -- check 'sudo brew services list'"
 fi
 
 echo ""
@@ -313,7 +336,7 @@ echo "Deploy target:"
 echo "  mise:     installed and activated for login shells. No Node version is"
 echo "            pinned here -- deploys bring their own via mise.toml/.nvmrc."
 echo "  Postgres: $_PG_STATUS (brew services, postgresql)"
-echo "  Redis:    $_REDIS_STATUS (brew services, redis)"
+echo "  Valkey:   $_VALKEY_STATUS (brew services, valkey; Redis-compatible)"
 echo ""
 echo "Manual steps: $TODO_FILE"
 echo "============================================================"
