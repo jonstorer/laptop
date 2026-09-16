@@ -310,52 +310,8 @@ launchctl bootstrap "gui/$(id -u)" "$POKE_PLIST"
 # drive, a full disk, heavy swapping, an overheating CPU, a stalled fan, lost
 # AC power (if a UPS is connected and macOS recognizes it), and whether
 # BlueBubbles/Messages.app are still up. Every run appends one summary line
-# to the log for trend-watching.
-#
-# A failing check texts you via BlueBubbles' own local REST API (it's already
-# running on this Mac for the bridge itself, so this needs no third-party
-# service): it calls http://localhost:1234/api/v1/message/text to send you an
-# iMessage as if BlueBubbles were messaging you directly. Falls back to email
-# over SMTP when that call fails -- which also covers the case where
-# BlueBubbles itself is the thing that's down and can't report its own outage.
-#
-# Opt in by rerunning this script with:
-#   BLUEBUBBLES_PASSWORD=<same password noted in TODO.md's REST API step> \
-#   BLUEBUBBLES_ALERT_NUMBER=<your number in E.164, e.g. +15551234567, or an iCloud email> \
-#     sh mac-bluebubbles
-# For the email fallback, add SMTP_HOST/SMTP_USER/SMTP_PASSWORD (and
-# SMTP_TO if it isn't the same as SMTP_USER). The easiest option reuses the
-# Apple ID already signed into BlueBubbles: SMTP_HOST=smtp.mail.me.com,
-# SMTP_USER=<Apple ID email>, SMTP_PASSWORD=<an app-specific password from
-# appleid.apple.com -- not your Apple ID password>. Any subset of these can
-# be set on a given run -- previously configured values are kept, not wiped.
-# Without any of them, checks still run and log locally -- see TODO.md.
-HEALTH_CONF="/etc/laptop-health.conf"
-
-# Updates (or adds) one KEY=value line in $HEALTH_CONF, leaving every other
-# line alone -- so setting one alert var on a later run doesn't erase another
-# one set previously. A no-op when the value is empty.
-_set_health_conf() {
-  [ -n "$2" ] || return 0
-  sudo touch "$HEALTH_CONF"
-  sudo chmod 600 "$HEALTH_CONF"
-  sudo sh -c "grep -vE '^$1=' '$HEALTH_CONF' 2>/dev/null > '$HEALTH_CONF.tmp'; printf '%s=%s\n' '$1' '$2' >> '$HEALTH_CONF.tmp'; mv '$HEALTH_CONF.tmp' '$HEALTH_CONF'"
-}
-
-_set_health_conf BLUEBUBBLES_PASSWORD "${BLUEBUBBLES_PASSWORD:-}"
-_set_health_conf BLUEBUBBLES_ALERT_NUMBER "${BLUEBUBBLES_ALERT_NUMBER:-}"
-_set_health_conf SMTP_HOST "${SMTP_HOST:-}"
-_set_health_conf SMTP_PORT "${SMTP_PORT:-}"
-_set_health_conf SMTP_USER "${SMTP_USER:-}"
-_set_health_conf SMTP_PASSWORD "${SMTP_PASSWORD:-}"
-_set_health_conf SMTP_TO "${SMTP_TO:-}"
-
-if [ -n "${BLUEBUBBLES_PASSWORD:-}${BLUEBUBBLES_ALERT_NUMBER:-}${SMTP_HOST:-}${SMTP_USER:-}${SMTP_PASSWORD:-}" ]; then
-  echo "Health-check alert config updated in $HEALTH_CONF."
-elif [ ! -s "$HEALTH_CONF" ]; then
-  echo "No health-check alert channel configured yet -- checks will log locally only (see TODO.md)."
-fi
-
+# to the log for trend-watching -- no push/text/email wiring for now, just
+# `tail -f /var/log/laptop-health.log` (or grep it) when checking in.
 HEALTH_SCRIPT="$HOME/Scripts/health-check.sh"
 mkdir -p "$HOME/Scripts"
 cat > "$HEALTH_SCRIPT" <<'HEALTHSH'
@@ -370,12 +326,13 @@ fi
 export PATH
 
 LOG="/var/log/laptop-health.log"
-CONF="/etc/laptop-health.conf"
-[ -f "$CONF" ] && . "$CONF"
 
 alerts=""
-add_alert() { alerts="$alerts
-- $1"; }
+alert_count=0
+add_alert() {
+  alert_count=$((alert_count + 1))
+  if [ -n "$alerts" ]; then alerts="$alerts; $1"; else alerts="$1"; fi
+}
 
 # SMART health -- catches a drive failing before it takes the box down. Some
 # older Apple SSDs don't expose SMART over their proprietary controller;
@@ -418,39 +375,9 @@ esac
 pgrep -x BlueBubbles > /dev/null 2>&1 || add_alert "BlueBubbles is not running"
 pgrep -x Messages > /dev/null 2>&1 || add_alert "Messages.app is not running"
 
-alert_count=$(echo "$alerts" | grep -c '^- ')
-printf '%s\tdisk=%s%%\tswap=%sMB\tcpu=%sC\tfan=%sRPM\talerts=%s\n' \
+printf '%s\tdisk=%s%%\tswap=%sMB\tcpu=%sC\tfan=%sRPM\talerts=%s\t%s\n' \
   "$(date '+%Y-%m-%dT%H:%M:%S%z')" "${disk_pct:-?}" "${swap_used:-0}" \
-  "${cpu_temp:-?}" "${fan_rpm:-?}" "$alert_count" >> "$LOG"
-
-# Text yourself via BlueBubbles' own local REST API first -- no third-party
-# service needed for the common case. Falls back to email over SMTP (if
-# configured) when that call fails, which also covers BlueBubbles itself
-# being down.
-if [ -n "$alerts" ]; then
-  msg="$(hostname):$alerts"
-  sent=0
-  if [ -n "${BLUEBUBBLES_PASSWORD:-}" ] && [ -n "${BLUEBUBBLES_ALERT_NUMBER:-}" ]; then
-    chat_guid="iMessage;-;${BLUEBUBBLES_ALERT_NUMBER}"
-    body=$(jq -n --arg guid "$chat_guid" --arg tmp "health-$(date +%s)" --arg msg "$msg" \
-      '{chatGuid: $guid, tempGuid: $tmp, message: $msg, method: "apple-script"}')
-    curl -fsS -m 10 -X POST "http://localhost:${BLUEBUBBLES_PORT:-1234}/api/v1/message/text?password=${BLUEBUBBLES_PASSWORD}" \
-      -H 'Content-Type: application/json' -d "$body" > /dev/null 2>&1 && sent=1
-  fi
-  if [ "$sent" -eq 0 ] && [ -n "${SMTP_HOST:-}" ] && [ -n "${SMTP_USER:-}" ] && [ -n "${SMTP_PASSWORD:-}" ]; then
-    smtp_to="${SMTP_TO:-$SMTP_USER}"
-    {
-      printf 'From: %s\r\n' "$SMTP_USER"
-      printf 'To: %s\r\n' "$smtp_to"
-      printf 'Subject: mac-bluebubbles health alert (%s)\r\n' "$(hostname)"
-      printf 'Date: %s\r\n' "$(date '+%a, %d %b %Y %H:%M:%S %z')"
-      printf '\r\n'
-      printf '%s\r\n' "$msg"
-    } | curl -fsS -m 15 --url "smtp://${SMTP_HOST}:${SMTP_PORT:-587}" --ssl-reqd \
-        --mail-from "$SMTP_USER" --mail-rcpt "$smtp_to" \
-        --user "${SMTP_USER}:${SMTP_PASSWORD}" --upload-file - > /dev/null 2>&1
-  fi
-fi
+  "${cpu_temp:-?}" "${fan_rpm:-?}" "$alert_count" "${alerts:-none}" >> "$LOG"
 HEALTHSH
 chmod +x "$HEALTH_SCRIPT"
 
@@ -537,7 +464,6 @@ _ok() { sh -c "$1" > /dev/null 2>&1 && printf 'x' || printf ' '; }
 
 _TS=$(_ok "tailscale status")
 _BB=$(_ok "pgrep -x BlueBubbles")
-_HEALTH_ALERTS=$(_ok "test -s '$HEALTH_CONF'")
 _GENERATED=$(date '+%Y-%m-%d %H:%M:%S')
 TODO_FILE="$HOME/TODO.md"
 
@@ -551,7 +477,6 @@ _Last updated: $_GENERATED — rerun mac-bluebubbles to refresh status._
 - [ ] Approve Automation permission — macOS will prompt when osascript first accesses Messages.app; allow in System Settings → Privacy & Security → Automation
 - [ ] Sign into iMessage — Messages.app → Settings → iMessage
 - [ ] On the machine connecting to this bridge, supply the BlueBubbles server URL and password
-- [$_HEALTH_ALERTS] Configure health-check alerts: rerun with \`BLUEBUBBLES_PASSWORD=... BLUEBUBBLES_ALERT_NUMBER=+1... sh mac-bluebubbles\` to text yourself via BlueBubbles (reuse the REST API password from the step above), optionally adding \`SMTP_HOST=smtp.mail.me.com SMTP_USER=<Apple ID email> SMTP_PASSWORD=<app-specific password>\` as an email fallback for when BlueBubbles itself is down. Or edit $HEALTH_CONF by hand. Without either, checks still log to /var/log/laptop-health.log every 15 minutes but nothing pages you.
 EOF
 
 ###############################################################################
@@ -571,14 +496,9 @@ echo ""
 echo "Tailscale: daemon started -- run 'sudo tailscale up' to authenticate."
 echo "After auth, SSH and Screen Sharing work from anywhere via Tailscale IP."
 echo ""
-if [ -s "$HEALTH_CONF" ]; then
-  _HEALTH_SUMMARY="alerts configured -- see $HEALTH_CONF"
-else
-  _HEALTH_SUMMARY="log-only -- no alert channel configured, see TODO.md"
-fi
 echo "Health checks: every 15 min via LaunchDaemon (com.laptop.health-check)."
 echo "  SMART, disk space, swap, CPU temp/fan, UPS power, service liveness."
-echo "  Log: /var/log/laptop-health.log ($_HEALTH_SUMMARY)"
+echo "  Log: /var/log/laptop-health.log (tail it -- no alerting configured)."
 echo ""
 echo "Manual steps: $TODO_FILE"
 echo "============================================================"

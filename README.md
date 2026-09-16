@@ -46,15 +46,6 @@ Sets up a Mac as an iMessage bridge via BlueBubbles, which exposes Messages.app 
 curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-bluebubbles' | sh
 ```
 
-Health-check alerts text you via BlueBubbles' own local REST API and are off until you supply the same password from its REST API setup step plus a number/email to send to:
-
-```sh
-curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/mac-bluebubbles' \
-  | BLUEBUBBLES_PASSWORD=your-rest-api-password BLUEBUBBLES_ALERT_NUMBER=+15551234567 sh
-```
-
-Add `SMTP_HOST`/`SMTP_USER`/`SMTP_PASSWORD` (and `SMTP_TO` if it isn't `SMTP_USER`) as an email fallback for when BlueBubbles itself is the thing that's down. Reusing the Apple ID already signed into BlueBubbles is the easiest option: `SMTP_HOST=smtp.mail.me.com`, `SMTP_USER=<Apple ID email>`, `SMTP_PASSWORD=<an app-specific password from appleid.apple.com>`.
-
 #### Mac — Headless Devbox (Apple Silicon)
 
 Sets up a MacBook Pro to run lid-closed, screen-off, as a Claude Code automation box: MCP-connected agent work (e.g. Jira cleanup) now, general dev work later. Reachable via SSH, Screen Sharing, and Tailscale.
@@ -171,7 +162,7 @@ Uses [Homebrew](http://brew.sh/) for package management. Works on both Apple Sil
 
 **Power & updates:** sleep disabled entirely (`pmset`), wake-on-LAN and auto-restart-after-power-loss enabled, and automatic macOS software updates disabled — a silent point release can strip root patches on OCLP-patched hardware and lock out remote access.
 
-**Health monitoring:** a root LaunchDaemon (`com.laptop.health-check`) runs every 15 minutes, checking SMART status, disk space, swap usage, CPU temperature/fan RPM, UPS power loss (if a UPS is connected), and whether BlueBubbles/Messages.app are up. Every run logs a summary line to `/var/log/laptop-health.log`. A failing check texts you via BlueBubbles' own local REST API (`localhost:1234`) if `BLUEBUBBLES_PASSWORD`/`BLUEBUBBLES_ALERT_NUMBER` were set when the script ran (see above), falling back to email over SMTP (via `curl`, no extra dependency) if that call fails and `SMTP_HOST`/`SMTP_USER`/`SMTP_PASSWORD` are set — which also covers BlueBubbles itself being down. Without either configured, checks only log locally. Config lives in `/etc/laptop-health.conf` (mode 600); rerunning the script updates only the variables you pass, so setting one later doesn't erase another.
+**Health monitoring:** a root LaunchDaemon (`com.laptop.health-check`) runs every 15 minutes, checking SMART status, disk space, swap usage, CPU temperature/fan RPM, UPS power loss (if a UPS is connected), and whether BlueBubbles/Messages.app are up. Every run appends a summary line (plus any failing checks) to `/var/log/laptop-health.log` — log-only for now, no alerting wired up; tail or grep it when checking in.
 
 Sets zsh as the default shell and applies macOS defaults optimized for autonomous/headless operation.
 
