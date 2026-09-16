@@ -315,19 +315,21 @@ launchctl bootstrap "gui/$(id -u)" "$POKE_PLIST"
 # A failing check texts you via BlueBubbles' own local REST API (it's already
 # running on this Mac for the bridge itself, so this needs no third-party
 # service): it calls http://localhost:1234/api/v1/message/text to send you an
-# iMessage as if BlueBubbles were messaging you directly. Falls back to a push
-# via ntfy.sh (https://ntfy.sh, no account needed) when that call fails --
-# which also covers the case where BlueBubbles itself is the thing that's down
-# and can't be used to report its own outage.
+# iMessage as if BlueBubbles were messaging you directly. Falls back to email
+# over SMTP when that call fails -- which also covers the case where
+# BlueBubbles itself is the thing that's down and can't report its own outage.
 #
 # Opt in by rerunning this script with:
 #   BLUEBUBBLES_PASSWORD=<same password noted in TODO.md's REST API step> \
 #   BLUEBUBBLES_ALERT_NUMBER=<your number in E.164, e.g. +15551234567, or an iCloud email> \
 #     sh mac-bluebubbles
-# Add HEALTH_NTFY_TOPIC=<a hard-to-guess topic> (anyone who knows it can read
-# your alerts) for the ntfy.sh fallback. Any subset can be set on a given run --
-# previously configured values are kept, not wiped. Without any of them,
-# checks still run and log locally -- see TODO.md.
+# For the email fallback, add SMTP_HOST/SMTP_USER/SMTP_PASSWORD (and
+# SMTP_TO if it isn't the same as SMTP_USER). The easiest option reuses the
+# Apple ID already signed into BlueBubbles: SMTP_HOST=smtp.mail.me.com,
+# SMTP_USER=<Apple ID email>, SMTP_PASSWORD=<an app-specific password from
+# appleid.apple.com -- not your Apple ID password>. Any subset of these can
+# be set on a given run -- previously configured values are kept, not wiped.
+# Without any of them, checks still run and log locally -- see TODO.md.
 HEALTH_CONF="/etc/laptop-health.conf"
 
 # Updates (or adds) one KEY=value line in $HEALTH_CONF, leaving every other
@@ -342,9 +344,13 @@ _set_health_conf() {
 
 _set_health_conf BLUEBUBBLES_PASSWORD "${BLUEBUBBLES_PASSWORD:-}"
 _set_health_conf BLUEBUBBLES_ALERT_NUMBER "${BLUEBUBBLES_ALERT_NUMBER:-}"
-_set_health_conf HEALTH_NTFY_TOPIC "${HEALTH_NTFY_TOPIC:-}"
+_set_health_conf SMTP_HOST "${SMTP_HOST:-}"
+_set_health_conf SMTP_PORT "${SMTP_PORT:-}"
+_set_health_conf SMTP_USER "${SMTP_USER:-}"
+_set_health_conf SMTP_PASSWORD "${SMTP_PASSWORD:-}"
+_set_health_conf SMTP_TO "${SMTP_TO:-}"
 
-if [ -n "${BLUEBUBBLES_PASSWORD:-}${BLUEBUBBLES_ALERT_NUMBER:-}${HEALTH_NTFY_TOPIC:-}" ]; then
+if [ -n "${BLUEBUBBLES_PASSWORD:-}${BLUEBUBBLES_ALERT_NUMBER:-}${SMTP_HOST:-}${SMTP_USER:-}${SMTP_PASSWORD:-}" ]; then
   echo "Health-check alert config updated in $HEALTH_CONF."
 elif [ ! -s "$HEALTH_CONF" ]; then
   echo "No health-check alert channel configured yet -- checks will log locally only (see TODO.md)."
@@ -418,8 +424,9 @@ printf '%s\tdisk=%s%%\tswap=%sMB\tcpu=%sC\tfan=%sRPM\talerts=%s\n' \
   "${cpu_temp:-?}" "${fan_rpm:-?}" "$alert_count" >> "$LOG"
 
 # Text yourself via BlueBubbles' own local REST API first -- no third-party
-# service needed for the common case. Falls back to ntfy.sh (if configured)
-# when that call fails, which also covers BlueBubbles itself being down.
+# service needed for the common case. Falls back to email over SMTP (if
+# configured) when that call fails, which also covers BlueBubbles itself
+# being down.
 if [ -n "$alerts" ]; then
   msg="$(hostname):$alerts"
   sent=0
@@ -430,9 +437,18 @@ if [ -n "$alerts" ]; then
     curl -fsS -m 10 -X POST "http://localhost:${BLUEBUBBLES_PORT:-1234}/api/v1/message/text?password=${BLUEBUBBLES_PASSWORD}" \
       -H 'Content-Type: application/json' -d "$body" > /dev/null 2>&1 && sent=1
   fi
-  if [ "$sent" -eq 0 ] && [ -n "${HEALTH_NTFY_TOPIC:-}" ]; then
-    curl -fsS -m 10 -H "Title: mac-bluebubbles health alert ($(hostname))" -H "Priority: high" \
-      -d "$msg" "https://ntfy.sh/$HEALTH_NTFY_TOPIC" > /dev/null 2>&1
+  if [ "$sent" -eq 0 ] && [ -n "${SMTP_HOST:-}" ] && [ -n "${SMTP_USER:-}" ] && [ -n "${SMTP_PASSWORD:-}" ]; then
+    smtp_to="${SMTP_TO:-$SMTP_USER}"
+    {
+      printf 'From: %s\r\n' "$SMTP_USER"
+      printf 'To: %s\r\n' "$smtp_to"
+      printf 'Subject: mac-bluebubbles health alert (%s)\r\n' "$(hostname)"
+      printf 'Date: %s\r\n' "$(date '+%a, %d %b %Y %H:%M:%S %z')"
+      printf '\r\n'
+      printf '%s\r\n' "$msg"
+    } | curl -fsS -m 15 --url "smtp://${SMTP_HOST}:${SMTP_PORT:-587}" --ssl-reqd \
+        --mail-from "$SMTP_USER" --mail-rcpt "$smtp_to" \
+        --user "${SMTP_USER}:${SMTP_PASSWORD}" --upload-file - > /dev/null 2>&1
   fi
 fi
 HEALTHSH
@@ -535,7 +551,7 @@ _Last updated: $_GENERATED — rerun mac-bluebubbles to refresh status._
 - [ ] Approve Automation permission — macOS will prompt when osascript first accesses Messages.app; allow in System Settings → Privacy & Security → Automation
 - [ ] Sign into iMessage — Messages.app → Settings → iMessage
 - [ ] On the machine connecting to this bridge, supply the BlueBubbles server URL and password
-- [$_HEALTH_ALERTS] Configure health-check alerts: rerun with \`BLUEBUBBLES_PASSWORD=... BLUEBUBBLES_ALERT_NUMBER=+1... sh mac-bluebubbles\` to text yourself via BlueBubbles (reuse the REST API password from the step above), optionally adding \`HEALTH_NTFY_TOPIC=your-topic-here\` as a fallback for when BlueBubbles itself is down. Or edit $HEALTH_CONF by hand. Without either, checks still log to /var/log/laptop-health.log every 15 minutes but nothing pages you.
+- [$_HEALTH_ALERTS] Configure health-check alerts: rerun with \`BLUEBUBBLES_PASSWORD=... BLUEBUBBLES_ALERT_NUMBER=+1... sh mac-bluebubbles\` to text yourself via BlueBubbles (reuse the REST API password from the step above), optionally adding \`SMTP_HOST=smtp.mail.me.com SMTP_USER=<Apple ID email> SMTP_PASSWORD=<app-specific password>\` as an email fallback for when BlueBubbles itself is down. Or edit $HEALTH_CONF by hand. Without either, checks still log to /var/log/laptop-health.log every 15 minutes but nothing pages you.
 EOF
 
 ###############################################################################
