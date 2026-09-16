@@ -88,14 +88,12 @@ fi
 
 # shellcheck disable=SC2086
 brew bundle $_bundle_flags --file=- <<EOF
-# GUI apps -- for physical access / debugging
-cask "alfred"
+# The bridge itself
 cask "bluebubbles"
-cask "iterm2"
-cask "rectangle"
 
-# Browser -- used by BlueBubbles web interface
-cask "google-chrome"
+# Terminal for logging in at the box itself; otherwise it's managed over SSH.
+# Keep this list in sync with _keep_casks in the cleanup below.
+cask "iterm2"
 
 # Config manipulation
 brew "jq"
@@ -115,6 +113,25 @@ if [ "$(uname -m)" = "arm64" ]; then
 else
   brew upgrade --cask
 fi
+
+###############################################################################
+# Cleanup -- remove casks this Mac doesn't need                              #
+###############################################################################
+
+# The Mac is managed over SSH, so the only apps it needs are BlueBubbles and
+# a terminal. Uninstall every other Homebrew-managed cask (e.g. alfred,
+# rectangle, google-chrome, slack). Apps installed outside Homebrew aren't
+# listed by brew and are left alone. Re-running is a no-op.
+_keep_casks="bluebubbles iterm2"
+for _cask in $(brew list --cask 2>/dev/null || true); do
+  case " $_keep_casks " in
+    *" $_cask "*) ;;
+    *)
+      echo "Uninstalling cask $_cask -- this Mac only runs BlueBubbles ..."
+      brew uninstall --cask "$_cask"
+      ;;
+  esac
+done
 
 ###############################################################################
 # Cleanup -- remove the deploy-target setup this Mac briefly had             #
