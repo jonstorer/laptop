@@ -233,21 +233,23 @@ else
   echo "Could not determine the Postgres cluster version -- skipping listen_addresses/port check." >&2
 fi
 
-# Same idea for Redis: apt's default redis.conf already binds to loopback
-# only, but pin the bind address and port explicitly and idempotently rather
-# than rely on the package default. Only touches lines that are already an
-# active (uncommented) directive, so it never turns a commented-out example
-# in the file's own documentation into a live one; appends a line if neither
-# directive is present at all. Only restart if the file actually changed.
+# Same idea for Redis: apt's default redis.conf already ships plain,
+# uncommented "bind 127.0.0.1 -::1" and "port 6379" lines, so pin both
+# explicitly with sed rather than rely on the package default holding.
+#
+# /etc/redis is mode 0750, owned by redis:redis, so an unprivileged `[ -f ]`
+# or `grep` against a path under it reports "not found" (a permission-denied
+# stat, not an absence) even when the file is right there -- do every check
+# through sudo, the same as the edit and the restart, or the whole block
+# silently skips itself with no error. Only restart if the file actually
+# changed.
 REDIS_CONF="/etc/redis/redis.conf"
-if [ -f "$REDIS_CONF" ]; then
+if sudo test -f "$REDIS_CONF"; then
   _redis_conf_before="$(sudo md5sum "$REDIS_CONF")"
   sudo sed -i \
     -e 's/^bind .*/bind 127.0.0.1 -::1/' \
     -e "s/^port .*/port $DEPLOY_REDIS_PORT/" \
     "$REDIS_CONF"
-  grep -qE '^bind ' "$REDIS_CONF" || echo 'bind 127.0.0.1 -::1' | sudo tee -a "$REDIS_CONF" > /dev/null
-  grep -qE '^port ' "$REDIS_CONF" || echo "port $DEPLOY_REDIS_PORT" | sudo tee -a "$REDIS_CONF" > /dev/null
   _redis_conf_after="$(sudo md5sum "$REDIS_CONF")"
   if [ "$_redis_conf_before" != "$_redis_conf_after" ]; then
     sudo systemctl restart redis-server
