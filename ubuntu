@@ -300,6 +300,37 @@ if [ "$SHELL" != "$shell_path" ]; then
 fi
 
 ###############################################################################
+# WiFi reliability -- headless box has no one to notice a dropped connection #
+###############################################################################
+
+wait_for_apt
+sudo -E apt install -y wireless-tools
+
+WIFI_DISPATCHER="/etc/NetworkManager/dispatcher.d/99-wifi-powersave"
+# shellcheck disable=SC2016
+WIFI_DISPATCHER_CONTENT='#!/bin/sh
+# Disable WiFi power management on connect
+[ "$2" = "up" ] && iwconfig "$1" power off 2>/dev/null || true
+'
+if [ "$(sudo cat "$WIFI_DISPATCHER" 2>/dev/null)" != "$(printf '%s' "$WIFI_DISPATCHER_CONTENT")" ]; then
+  printf '%s' "$WIFI_DISPATCHER_CONTENT" | sudo tee "$WIFI_DISPATCHER" > /dev/null
+fi
+sudo chmod +x "$WIFI_DISPATCHER"
+
+# Mask sleep/suspend targets so nothing ever puts the box (and its WiFi) to
+# sleep. mask is idempotent -- it's a no-op if already masked.
+sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+
+# Cron-based watchdog: ping the default gateway every minute and restart
+# NetworkManager if it doesn't answer. Runs from root's crontab, not the
+# user's, since restarting NetworkManager needs root.
+# shellcheck disable=SC2016
+WIFI_CRON='* * * * * ping -c 1 -W 5 $(ip route | grep default | awk '"'"'{print $3}'"'"') > /dev/null 2>&1 || systemctl restart NetworkManager'
+if ! sudo crontab -l 2>/dev/null | grep -qF "$WIFI_CRON"; then
+  (sudo crontab -l 2>/dev/null; echo "$WIFI_CRON") | sudo crontab -
+fi
+
+###############################################################################
 # Time sync -- clock skew breaks OAuth flows and GitHub Actions auth         #
 ###############################################################################
 
