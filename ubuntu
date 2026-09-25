@@ -300,6 +300,20 @@ if [ "$SHELL" != "$shell_path" ]; then
 fi
 
 ###############################################################################
+# System logs -- 'last' command and journal read access                     #
+###############################################################################
+
+sudo -E apt install -y util-linux-extra
+
+# Group membership only takes effect in new sessions, so the current shell
+# still needs sudo to read the journal until the next login.
+if ! id -nG "$USER" | tr ' ' '\n' | grep -qx systemd-journal; then
+  echo "Adding $USER to the systemd-journal group ..."
+  sudo usermod -aG systemd-journal "$USER"
+  echo "Log out and back in (or run 'newgrp systemd-journal') to read the journal without sudo."
+fi
+
+###############################################################################
 # WiFi reliability -- headless box has no one to notice a dropped connection #
 ###############################################################################
 
