@@ -344,13 +344,13 @@ fi
 ###############################################################################
 
 wait_for_apt
-sudo env DEBIAN_FRONTEND=noninteractive apt install -y wireless-tools
+sudo env DEBIAN_FRONTEND=noninteractive apt install -y iw
 
 WIFI_DISPATCHER="/etc/NetworkManager/dispatcher.d/99-wifi-powersave"
 # shellcheck disable=SC2016
 WIFI_DISPATCHER_CONTENT='#!/bin/sh
 # Disable WiFi power management on connect
-[ "$2" = "up" ] && iwconfig "$1" power off 2>/dev/null || true
+[ "$2" = "up" ] && iw dev "$1" set power_save off 2>/dev/null || true
 '
 if [ "$(sudo cat "$WIFI_DISPATCHER" 2>/dev/null)" != "$(printf '%s' "$WIFI_DISPATCHER_CONTENT")" ]; then
   printf '%s' "$WIFI_DISPATCHER_CONTENT" | sudo tee "$WIFI_DISPATCHER" > /dev/null
