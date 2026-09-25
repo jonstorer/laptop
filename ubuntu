@@ -62,6 +62,11 @@ wait_for_apt
 sudo env DEBIAN_FRONTEND=noninteractive apt update
 sudo env DEBIAN_FRONTEND=noninteractive apt full-upgrade -y
 
+# full-upgrade can leave behind packages nothing depends on anymore (old
+# kernels, superseded libs) -- clear them out so they don't just accumulate
+# on every run.
+sudo env DEBIAN_FRONTEND=noninteractive apt autoremove -y
+
 sudo env DEBIAN_FRONTEND=noninteractive apt install -y \
   build-essential \
   ca-certificates \
