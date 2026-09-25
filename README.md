@@ -74,21 +74,21 @@ or
 wget --no-cache -qO- 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' | sh
 ```
 
-Postgres and Redis default to ports 5433/6380, off their standard ports so a docker-compose dev stack can
-still use 5432/6379 on the same box. Override with `DEPLOY_POSTGRES_PORT`/`DEPLOY_REDIS_PORT` if that ever
-collides with something else instead:
+All environment variables below are optional -- the plain command above is all you need. Set any of them
+by prefixing the command, e.g. `| GITHUB_RUNNER_REPO=owner/name sh`, and combine as many as you like:
 
-```sh
-curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' \
-  | DEPLOY_POSTGRES_PORT=5434 DEPLOY_REDIS_PORT=6381 sh
-```
+| Variable                | Default | Effect                                                |
+| ------------------------ | ------- | ------------------------------------------------------ |
+| `DEPLOY_POSTGRES_PORT`   | `5433`  | Port Postgres listens on (off 5432 so a docker-compose dev stack can still use it) |
+| `DEPLOY_REDIS_PORT`      | `6380`  | Port Redis listens on (off 6379, same reason)         |
+| `GITHUB_RUNNER_REPO`     | unset   | Registers a GitHub Actions self-hosted runner against `owner/name`; the runner is skipped entirely when unset |
+| `GITHUB_RUNNER_TOKEN`    | unset   | Registration token for the runner; only needed if `gh` isn't authenticated on this box |
 
-The runner is off unless `GITHUB_RUNNER_REPO` names a repo as `owner/name`:
-
-```sh
-curl -H "Cache-Control: no-cache" -fsS 'https://raw.githubusercontent.com/jonstorer/laptop/main/ubuntu' \
-  | GITHUB_RUNNER_REPO=owner/name sh
-```
+Leaving `DEPLOY_POSTGRES_PORT`/`DEPLOY_REDIS_PORT` unset on a later run does not move an already-running
+Postgres/Redis back to the default port -- the script remembers the last port it set (in
+`~/.laptop/ubuntu-deploy.env`) and reuses it until you explicitly override it again. Likewise, leaving
+`GITHUB_RUNNER_REPO` unset on a later run does not unregister or touch an already-installed runner; it's
+only consulted the first time the runner is registered.
 
 #### Raspberry Pi
 

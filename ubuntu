@@ -207,8 +207,25 @@ fi
 # the two never collide and no app repo has to change its compose file.
 # Override with DEPLOY_POSTGRES_PORT / DEPLOY_REDIS_PORT if these defaults
 # ever collide with something else instead.
-DEPLOY_POSTGRES_PORT="${DEPLOY_POSTGRES_PORT:-5433}"
-DEPLOY_REDIS_PORT="${DEPLOY_REDIS_PORT:-6380}"
+#
+# Not passing them on a later run must not silently move the ports back to
+# the hardcoded defaults below -- that would restart Postgres/Redis on a
+# port nothing expects them on. So the ports actually picked (whether
+# defaulted or overridden) are saved to a state file after every run, and an
+# unset env var falls back to that remembered value before falling back to
+# the hardcoded default. Precedence: env var this run > remembered value >
+# hardcoded default.
+DEPLOY_STATE="$HOME/.laptop/ubuntu-deploy.env"
+_deploy_postgres_port_arg="$DEPLOY_POSTGRES_PORT"
+_deploy_redis_port_arg="$DEPLOY_REDIS_PORT"
+# shellcheck disable=SC1090
+[ -f "$DEPLOY_STATE" ] && . "$DEPLOY_STATE"
+DEPLOY_POSTGRES_PORT="${_deploy_postgres_port_arg:-${DEPLOY_POSTGRES_PORT:-5433}}"
+DEPLOY_REDIS_PORT="${_deploy_redis_port_arg:-${DEPLOY_REDIS_PORT:-6380}}"
+
+mkdir -p "$HOME/.laptop"
+printf 'DEPLOY_POSTGRES_PORT=%s\nDEPLOY_REDIS_PORT=%s\n' \
+  "$DEPLOY_POSTGRES_PORT" "$DEPLOY_REDIS_PORT" > "$DEPLOY_STATE"
 
 wait_for_apt
 sudo -E apt install -y postgresql redis-server
