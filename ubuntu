@@ -14,7 +14,11 @@ while true; do sudo -n true; sleep 10; kill -0 "$$" || exit; done 2>/dev/null &
 
 # apt 3.x (Ubuntu 26.04) prompts "Continue? [Y/n]" even with -y when stdin is
 # a pipe. DEBIAN_FRONTEND=noninteractive suppresses all interactive apt prompts.
-export DEBIAN_FRONTEND=noninteractive
+# Passed per-call as `sudo env DEBIAN_FRONTEND=noninteractive apt ...` below
+# rather than exported and forwarded with `sudo -E` -- many sudoers policies
+# refuse to preserve the whole environment and just warn ("sudo: preserving
+# the entire environment is not supported, '-E' is ignored"), where `env`
+# only asks for this one variable and always works.
 
 # Run logging -- append one tab-separated line per run to ~/.laptop/runs.log so
 # it's easy to see which script ran on which host, when, for how long, against
@@ -55,10 +59,10 @@ wait_for_apt() {
 ###############################################################################
 
 wait_for_apt
-sudo -E apt update
-sudo -E apt full-upgrade -y
+sudo env DEBIAN_FRONTEND=noninteractive apt update
+sudo env DEBIAN_FRONTEND=noninteractive apt full-upgrade -y
 
-sudo -E apt install -y \
+sudo env DEBIAN_FRONTEND=noninteractive apt install -y \
   build-essential \
   ca-certificates \
   curl \
@@ -89,8 +93,8 @@ if ! command -v gh > /dev/null 2>&1; then
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
   wait_for_apt
-  sudo -E apt update
-  sudo -E apt install -y gh
+  sudo env DEBIAN_FRONTEND=noninteractive apt update
+  sudo env DEBIAN_FRONTEND=noninteractive apt install -y gh
 else
   echo "GitHub CLI already installed, skipping."
 fi
@@ -127,8 +131,8 @@ if ! command -v claude > /dev/null 2>&1; then
   echo "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main" \
     | sudo tee /etc/apt/sources.list.d/claude-code.list > /dev/null
   wait_for_apt
-  sudo -E apt update
-  sudo -E apt install -y claude-code
+  sudo env DEBIAN_FRONTEND=noninteractive apt update
+  sudo env DEBIAN_FRONTEND=noninteractive apt install -y claude-code
 else
   echo "Claude Code CLI already installed, skipping."
 fi
@@ -146,8 +150,8 @@ if ! command -v google-chrome > /dev/null 2>&1; then
   echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" \
     | sudo tee /etc/apt/sources.list.d/google-chrome.list > /dev/null
   wait_for_apt
-  sudo -E apt update
-  sudo -E apt install -y google-chrome-stable
+  sudo env DEBIAN_FRONTEND=noninteractive apt update
+  sudo env DEBIAN_FRONTEND=noninteractive apt install -y google-chrome-stable
 else
   echo "Google Chrome already installed, skipping."
 fi
@@ -166,8 +170,8 @@ if ! command -v docker > /dev/null 2>&1; then
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
     | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
   wait_for_apt
-  sudo -E apt update
-  sudo -E apt install -y \
+  sudo env DEBIAN_FRONTEND=noninteractive apt update
+  sudo env DEBIAN_FRONTEND=noninteractive apt install -y \
     docker-ce \
     docker-ce-cli \
     containerd.io \
@@ -228,7 +232,7 @@ printf 'DEPLOY_POSTGRES_PORT=%s\nDEPLOY_REDIS_PORT=%s\n' \
   "$DEPLOY_POSTGRES_PORT" "$DEPLOY_REDIS_PORT" > "$DEPLOY_STATE"
 
 wait_for_apt
-sudo -E apt install -y postgresql redis-server
+sudo env DEBIAN_FRONTEND=noninteractive apt install -y postgresql redis-server
 
 sudo systemctl enable --now postgresql
 sudo systemctl enable --now redis-server
@@ -286,8 +290,8 @@ if ! command -v tailscale > /dev/null 2>&1; then
   curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${DISTRO_CODENAME}.tailscale-keyring.list" \
     | sudo tee /etc/apt/sources.list.d/tailscale.list > /dev/null
   wait_for_apt
-  sudo -E apt update
-  sudo -E apt install -y tailscale
+  sudo env DEBIAN_FRONTEND=noninteractive apt update
+  sudo env DEBIAN_FRONTEND=noninteractive apt install -y tailscale
 fi
 
 sudo systemctl enable tailscaled
@@ -297,7 +301,7 @@ sudo systemctl start tailscaled
 # SSH -- openssh-server for remote access                                     #
 ###############################################################################
 
-sudo -E apt install -y openssh-server
+sudo env DEBIAN_FRONTEND=noninteractive apt install -y openssh-server
 sudo systemctl enable ssh
 sudo systemctl start ssh
 
@@ -320,7 +324,7 @@ fi
 # System logs -- 'last' command and journal read access                     #
 ###############################################################################
 
-sudo -E apt install -y util-linux-extra
+sudo env DEBIAN_FRONTEND=noninteractive apt install -y util-linux-extra
 
 # Group membership only takes effect in new sessions, so the current shell
 # still needs sudo to read the journal until the next login.
@@ -335,7 +339,7 @@ fi
 ###############################################################################
 
 wait_for_apt
-sudo -E apt install -y wireless-tools
+sudo env DEBIAN_FRONTEND=noninteractive apt install -y wireless-tools
 
 WIFI_DISPATCHER="/etc/NetworkManager/dispatcher.d/99-wifi-powersave"
 # shellcheck disable=SC2016
@@ -366,7 +370,7 @@ fi
 ###############################################################################
 
 if ! systemctl list-unit-files systemd-timesyncd.service > /dev/null 2>&1; then
-  sudo -E apt install -y systemd-timesyncd
+  sudo env DEBIAN_FRONTEND=noninteractive apt install -y systemd-timesyncd
 fi
 sudo systemctl enable --now systemd-timesyncd
 
@@ -406,7 +410,7 @@ if [ -n "$RUNNER_REPO" ] || [ -f "$RUNNER_DIR/config.sh" ]; then
   # implicit.
   if ! command -v ssh > /dev/null 2>&1; then
     echo "Installing OpenSSH client ..."
-    sudo -E apt install -y openssh-client
+    sudo env DEBIAN_FRONTEND=noninteractive apt install -y openssh-client
   else
     echo "OpenSSH client already installed, skipping."
   fi
@@ -442,7 +446,7 @@ if [ -n "$RUNNER_REPO" ] || [ -f "$RUNNER_DIR/config.sh" ]; then
     # .NET runtime libraries (libicu, libssl, libkrb5 ...). The runner ships its
     # own installer, which knows the package-name drift across Ubuntu releases.
     wait_for_apt
-    sudo -E "$RUNNER_DIR/bin/installdependencies.sh"
+    sudo env DEBIAN_FRONTEND=noninteractive "$RUNNER_DIR/bin/installdependencies.sh"
   else
     echo "GitHub Actions runner already installed, skipping download."
   fi
